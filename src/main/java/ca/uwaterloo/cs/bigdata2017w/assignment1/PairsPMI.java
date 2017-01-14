@@ -67,12 +67,42 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyReducer extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
+	public static final class MyCombiner extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
+		private static final PairOfFloats PMIVALUE = new PairOfFloats();
 
 		@Override
 		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
 		throws IOException, InterruptedException {
-			
+			int sum = 0;
+			Iterator<FloatWritable> iter = values.iterator();
+			while(iter.hasNext()) {
+				sum += iter.next().get();
+			}
+			PMIVALUE.set(0, sum);
+			context.write(key, PMIVALUE);
+		}
+	}
+
+	public static final class MyReducer extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
+		private static final PairOfFloats PMIVALUE = new PairOfFloats();
+		private float marginal = 0.0f;
+		
+		@Override
+		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
+		throws IOException, InterruptedException {
+			float sum = 0.0f;
+			Iterator<FloatWritable> iter = values.iterator();
+			while (iter.hasNext()) {
+				sum += iter.next().get();
+			}
+
+			if (key.getRightElement().equals("*")) {
+				PMIVALUE.set(0, sum);
+				context.write(key, PMIVALUE);
+				marginal = sum;
+			} else {
+				// implement this
+			}
 		}
 	}
 
