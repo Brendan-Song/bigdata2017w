@@ -5,14 +5,17 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -21,32 +24,55 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
+import tl.lin.data.pair.PairOfFloats;
+import tl.lin.data.pair.PairOfStrings;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public class PairsPMI extends Configured implements Tool {
 	private static final Logger LOG = Logger.getLogger(PairsPMI.class);
 
-	public static final class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
-		private static final IntWritable ONE = new intWritable(1);
-		private static final Text WORD = new Text();
+	public static final class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, FloatWritable> {
+		private static final FloatWritable ONE = new FloatWritable(1);
+		private static final PairOfStrings PMIKEY = new PairOfStrings();
 
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
+			HashMap<PairOfStrings, Boolean> hash = new HashMap<PairOfStrings, Boolean>();
+			List<String> tokens = Tokenizer.tokenize(value.toString());
 
+			if (tokens.size() < 2) return;
+			for (int i = 0; i < tokens.size() && i < 40; i++) {
+				for (int j = 0; j < tokens.size() && j < 40; j++) {
+					if (i != j && !tokens.get(i).equals(tokens.get(j))) {
+						PMIKEY.set(tokens.get(i), tokens.get(j));
+						if (!hash.get(PMIKEY)) {
+							context.write(PMIKEY, ONE);
+							hash.put(PMIKEY, true);
+						}
+					} else if (i == j) {
+						PMIKEY.set(tokens.get(i), "*");
+						if (!hash.get(PMIKEY)) {
+							context.write(PMIKEY, ONE);
+							hash.put(PMIKEY, true);
+						}
+					}
+				}
+			}
 		}
 	}
 
-	public static final class MyReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+	public static final class MyReducer extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
 
 		@Override
-		public void reduce(Text key, Iterable<IntWritable> values, Context context)
+		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
 		throws IOException, InterruptedException {
-
+			
 		}
 	}
 
@@ -101,7 +127,7 @@ public class PairsPMI extends Configured implements Tool {
 		job.setOutputValueClass(IntWritable.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
 
-		job.setMapperClass(args.imc ? MyMapperIMC.class : MyMapper.class);
+		job.setMapperClass(MyMapper.class);
 		job.setCombinerClass(MyReducer.class);
 		job.setReducerClass(MyReducer.class);
 
