@@ -43,27 +43,33 @@ public class PairsPMI extends Configured implements Tool {
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
-			HashMap<PairOfStrings, Boolean> hash = new HashMap<PairOfStrings, Boolean>();
-			List<String> tokens = Tokenizer.tokenize(value.toString());
+		HashMap<PairOfStrings, Boolean> hash = new HashMap<PairOfStrings, Boolean>();
+		List<String> tokens = Tokenizer.tokenize(value.toString());
 
-			if (tokens.size() < 2) return;
-			for (int i = 0; i < tokens.size() && i < 40; i++) {
-				for (int j = 0; j < tokens.size() && j < 40; j++) {
-					if (i != j && !tokens.get(i).equals(tokens.get(j))) {
-						PMIKEY.set(tokens.get(i), tokens.get(j));
-						if (!hash.get(PMIKEY)) {
-							context.write(PMIKEY, ONE);
-							hash.put(PMIKEY, true);
-						}
-					} else if (i == j) {
-						PMIKEY.set(tokens.get(i), "*");
-						if (!hash.get(PMIKEY)) {
-							context.write(PMIKEY, ONE);
-							hash.put(PMIKEY, true);
-						}
+		// get total count of lines
+		PMIKEY.set("*", "*");
+		context.write(PMIKEY, ONE);
+
+		if (tokens.size() < 2) return;
+		for (int i = 0; i < tokens.size() && i < 40; i++) {
+			for (int j = 0; j < tokens.size() && j < 40; j++) {
+				// co-occurring pair
+				if (i != j && !tokens.get(i).equals(tokens.get(j))) {
+					PMIKEY.set(tokens.get(i), tokens.get(j));
+					if (!hash.get(PMIKEY)) {
+						context.write(PMIKEY, ONE);
+						hash.put(PMIKEY, true);
+					}
+					// same word
+				} else if (i == j) {
+					PMIKEY.set(tokens.get(i), "*");
+					if (!hash.get(PMIKEY)) {
+						context.write(PMIKEY, ONE);
+						hash.put(PMIKEY, true);
 					}
 				}
 			}
+		}
 		}
 	}
 
@@ -73,36 +79,55 @@ public class PairsPMI extends Configured implements Tool {
 		@Override
 		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
 		throws IOException, InterruptedException {
-			int sum = 0;
-			Iterator<FloatWritable> iter = values.iterator();
-			while(iter.hasNext()) {
-				sum += iter.next().get();
-			}
-			PMIVALUE.set(0, sum);
-			context.write(key, PMIVALUE);
+		int sum = 0;
+		Iterator<FloatWritable> iter = values.iterator();
+		while(iter.hasNext()) {
+			sum += iter.next().get();
+		}
+		PMIVALUE.set(0, sum);
+		context.write(key, PMIVALUE);
 		}
 	}
 
 	public static final class MyReducer extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
 		private static final PairOfFloats PMIVALUE = new PairOfFloats();
-		private float marginal = 0.0f;
-		
+		private static HashMap<String, Float> hash = new HashMap<String, Float>();
+		private float total = 0.0f;
+
 		@Override
 		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
 		throws IOException, InterruptedException {
-			float sum = 0.0f;
-			Iterator<FloatWritable> iter = values.iterator();
-			while (iter.hasNext()) {
-				sum += iter.next().get();
-			}
+		float sum = 0.0f;
+		Iterator<FloatWritable> iter = values.iterator();
+		while (iter.hasNext()) {
+			sum += iter.next().get();
+		}
 
-			if (key.getRightElement().equals("*")) {
-				PMIVALUE.set(0, sum);
-				context.write(key, PMIVALUE);
-				marginal = sum;
-			} else {
-				// implement this
-			}
+		// total number of lines
+		if (key.getLeftElement().equals("*")) {
+			PMIVALUE.set(0, sum);
+			context.write(key, PMIVALUE);
+			total = sum;
+			// counts of each word
+		} else if (key.getRightElement().equals("*")) {
+			PMIVALUE.set(0, sum);
+			context.write(key, PMIVALUE);
+			hash.put(key.getLeftElement(), sum / total);
+		} else {
+			float d1 = hash.get(key.getLeftElement());
+			float d2 = hash.get(key.getRightElement());
+			float numerator = sum / total;
+			float pmi = (float)(Math.log10(numerator / (d1 * d2)));
+			PMIVALUE.set(pmi, sum);
+			context.write(key, PMIVALUE);
+		}
+		}
+	}
+
+	private static final class MyPartitioner extends Partitioner<PairOfStrings, FloatWritable> {
+		@Override
+		public int getPartition(PairOfStrings key, FloatWritable value, int numReduceTasks) {
+			return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
 		}
 	}
 
