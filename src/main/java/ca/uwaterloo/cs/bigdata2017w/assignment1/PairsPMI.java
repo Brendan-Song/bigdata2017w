@@ -56,14 +56,14 @@ public class PairsPMI extends Configured implements Tool {
 				// co-occurring pair
 				if (i != j && !tokens.get(i).equals(tokens.get(j))) {
 					PMIKEY.set(tokens.get(i), tokens.get(j));
-					if (!hash.get(PMIKEY)) {
+					if (!hash.containsKey(PMIKEY) || !hash.get(PMIKEY)) {
 						context.write(PMIKEY, ONE);
 						hash.put(PMIKEY, true);
 					}
 					// same word
 				} else if (i == j) {
 					PMIKEY.set(tokens.get(i), "*");
-					if (!hash.get(PMIKEY)) {
+					if (!hash.containsKey(PMIKEY) || !hash.get(PMIKEY)) {
 						context.write(PMIKEY, ONE);
 						hash.put(PMIKEY, true);
 					}
@@ -73,19 +73,19 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyCombiner extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, PairOfFloats> {
-		private static final PairOfFloats PMIVALUE = new PairOfFloats();
+	public static final class MyCombiner extends Reducer<PairOfStrings, FloatWritable, PairOfStrings, FloatWritable> {
+		private static final FloatWritable COUNT = new FloatWritable();
 
 		@Override
 		public void reduce(PairOfStrings key, Iterable<FloatWritable> values, Context context)
 		throws IOException, InterruptedException {
-		int sum = 0;
+		float sum = 0.0f;
 		Iterator<FloatWritable> iter = values.iterator();
 		while(iter.hasNext()) {
 			sum += iter.next().get();
 		}
-		PMIVALUE.set(0, sum);
-		context.write(key, PMIVALUE);
+		COUNT.set(sum);
+		context.write(key, COUNT);
 		}
 	}
 
@@ -105,12 +105,12 @@ public class PairsPMI extends Configured implements Tool {
 
 		// total number of lines
 		if (key.getLeftElement().equals("*")) {
-			PMIVALUE.set(0, sum);
+			PMIVALUE.set(0.0f, sum);
 			context.write(key, PMIVALUE);
 			total = sum;
 			// counts of each word
 		} else if (key.getRightElement().equals("*")) {
-			PMIVALUE.set(0, sum);
+			PMIVALUE.set(0.0f, sum);
 			context.write(key, PMIVALUE);
 			hash.put(key.getLeftElement(), sum / total);
 		} else {
@@ -176,15 +176,16 @@ public class PairsPMI extends Configured implements Tool {
 		FileInputFormat.setInputPaths(job, new Path(args.input));
 		FileOutputFormat.setOutputPath(job, new Path(args.output));
 
-		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(IntWritable.class);
-		job.setOutputKeyClass(Text.class);
-		job.setOutputValueClass(IntWritable.class);
+		job.setMapOutputKeyClass(PairOfStrings.class);
+		job.setMapOutputValueClass(FloatWritable.class);
+		job.setOutputKeyClass(PairOfStrings.class);
+		job.setOutputValueClass(PairOfFloats.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
 
 		job.setMapperClass(MyMapper.class);
-		job.setCombinerClass(MyReducer.class);
+		job.setCombinerClass(MyCombiner.class);
 		job.setReducerClass(MyReducer.class);
+		job.setPartitionerClass(MyPartitioner.class);
 
 		// Delete the output directory if it exists already.
 		Path outputDir = new Path(args.output);
