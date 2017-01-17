@@ -62,7 +62,7 @@ public class PairsPMI extends Configured implements Tool {
 					}
 					// same word
 				} else if (i == j) {
-					PMIKEY.set(tokens.get(i), "*");
+					PMIKEY.set("*", tokens.get(i));
 					if (!hash.containsKey(PMIKEY) || !hash.get(PMIKEY)) {
 						context.write(PMIKEY, ONE);
 						hash.put(PMIKEY, true);
@@ -104,15 +104,15 @@ public class PairsPMI extends Configured implements Tool {
 		}
 
 		// total number of lines
-		if (key.getLeftElement().equals("*")) {
+		if (key.getRightElement().equals("*")) {
 			PMIVALUE.set(0.0f, sum);
 			context.write(key, PMIVALUE);
 			total = sum;
 			// counts of each word
-		} else if (key.getRightElement().equals("*")) {
+		} else if (key.getLeftElement().equals("*")) {
 			PMIVALUE.set(0.0f, sum);
 			context.write(key, PMIVALUE);
-			hash.put(key.getLeftElement(), sum / total);
+			hash.put(key.getRightElement(), sum / total);
 		} else {
 			float d1 = hash.get(key.getLeftElement());
 			float d2 = hash.get(key.getRightElement());
@@ -124,12 +124,12 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	private static final class MyPartitioner extends Partitioner<PairOfStrings, FloatWritable> {
-		@Override
-		public int getPartition(PairOfStrings key, FloatWritable value, int numReduceTasks) {
-			return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
-		}
-	}
+	//private static final class MyPartitioner extends Partitioner<PairOfStrings, FloatWritable> {
+	//	@Override
+	//	public int getPartition(PairOfStrings key, FloatWritable value, int numReduceTasks) {
+	//		return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
+	//	}
+	//}
 
 	private PairsPMI() {}
 
@@ -185,7 +185,7 @@ public class PairsPMI extends Configured implements Tool {
 		job.setMapperClass(MyMapper.class);
 		job.setCombinerClass(MyCombiner.class);
 		job.setReducerClass(MyReducer.class);
-		job.setPartitionerClass(MyPartitioner.class);
+		//job.setPartitionerClass(MyPartitioner.class);
 
 		// Delete the output directory if it exists already.
 		Path outputDir = new Path(args.output);
