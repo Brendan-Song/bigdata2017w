@@ -47,20 +47,20 @@ public class StripesPMI extends Configured implements Tool {
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
-		Map<String, HMapStFW> stripes = new HashMap<>();
-		List<String> tokens = Tokenizer.tokenize(value.toString());
+		//Map<String, HMapStFW> stripes = new HashMap<>();
+		//List<String> tokens = Tokenizer.tokenize(value.toString());
 
-		for (int i = 0; i < tokens.size() && i < 40; i++) {
-			PMIKEY.set("*", tokens.get(i));
-			if (!hash.containsKey(PMIKEY)) {
-				context.write(PMIKEY, ONE);
-				hash.put(PMIKEY, true);
-			}
-		}
+		//for (int i = 0; i < tokens.size() && i < 40; i++) {
+		//	PMIKEY.set("*", tokens.get(i));
+		//	if (!hash.containsKey(PMIKEY)) {
+		//		context.write(PMIKEY, ONE);
+		//		hash.put(PMIKEY, true);
+		//	}
+		//}
 
 		// count lines
-		PMIKEY.set("*", "*");
-		context.write(PMIKEY, ONE);
+		//PMIKEY.set("*", "*");
+		//context.write(PMIKEY, ONE);
 		}
 	}
 
@@ -172,7 +172,7 @@ public class StripesPMI extends Configured implements Tool {
 		}
 	}
 
-	private PairsPMI() {}
+	private StripesPMI() {}
 
 	private static final class Args {
 		@Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
@@ -201,7 +201,7 @@ public class StripesPMI extends Configured implements Tool {
 			return -1;
 		}
 
-		LOG.info("Tool: " + PairsPMI.class.getSimpleName());
+		LOG.info("Tool: " + StripesPMI.class.getSimpleName());
 		LOG.info(" - input path: " + args.input);
 		LOG.info(" - output path: " + args.output);
 		LOG.info(" - number of reducers: " + args.numReducers);
@@ -280,6 +280,6 @@ public class StripesPMI extends Configured implements Tool {
 	 * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
 	 */
 	public static void main(String[] args) throws Exception {
-		ToolRunner.run(new PairsPMI(), args);
+		ToolRunner.run(new StripesPMI(), args);
 	}
 }
