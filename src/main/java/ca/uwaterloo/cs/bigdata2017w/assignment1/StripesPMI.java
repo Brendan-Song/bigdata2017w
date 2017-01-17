@@ -29,6 +29,7 @@ import org.kohsuke.args4j.ParserProperties;
 import tl.lin.data.pair.PairOfFloats;
 import tl.lin.data.pair.PairOfFloatInt;
 import tl.lin.data.pair.PairOfStrings;
+import tl.lin.data.map.HMapStFW;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -36,18 +37,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class PairsPMI extends Configured implements Tool {
-	private static final Logger LOG = Logger.getLogger(PairsPMI.class);
+public class StripesPMI extends Configured implements Tool {
+	private static final Logger LOG = Logger.getLogger(StripesPMI.class);
 
-	// Count lines and words
-	public static final class PreMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
+	public static final class PreMapper extends Mapper<LongWritable, Text, Text, HMapStFW> {
 		private static final IntWritable ONE = new IntWritable(1);
-		private static final PairOfStrings PMIKEY = new PairOfStrings();
+		private static final Text TEXT = new Text();
 
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
-		HashMap<PairOfStrings, Boolean> hash = new HashMap<PairOfStrings, Boolean>();
+		Map<String, HMapStFW> stripes = new HashMap<>();
 		List<String> tokens = Tokenizer.tokenize(value.toString());
 
 		for (int i = 0; i < tokens.size() && i < 40; i++) {
