@@ -30,6 +30,7 @@ import tl.lin.data.pair.PairOfFloats;
 import tl.lin.data.pair.PairOfFloatInt;
 import tl.lin.data.pair.PairOfStrings;
 import tl.lin.data.map.HMapStFW;
+import tl.lin.data.map.HMapStIW;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -64,13 +65,13 @@ public class StripesPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyMapper extends Mapper<LongWritable, Text, Text, HMapStFW> {
+	public static final class MyMapper extends Mapper<LongWritable, Text, Text, HMapStIW> {
 		private static final Text PMIKEY = new Text();
 
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
-		HashMap<String, HMapStFW> stripes = new HashMap<String, HMapStFW>();
+		HashMap<String, HMapStIW> stripes = new HashMap<String, HMapStIW>();
 		List<String> tokens = Tokenizer.tokenize(value.toString());
 
 		for (int i = 0; i < tokens.size() && i < 40; i++) {
@@ -82,16 +83,16 @@ public class StripesPMI extends Configured implements Tool {
 				if (i != j && !w1.equals(w2)) {
 					if (!found.containsKey(w2)) {
 						if (stripes.containsKey(w1)) {
-							HMapStFW stripe = stripes.get(w1);
+							HMapStIW stripe = stripes.get(w1);
 							if (stripe.containsKey(w2)) {
-								stripe.put(w2, stripe.get(w2) + 1.0f);
+								stripe.put(w2, stripe.get(w2) + 1);
 							} else {
-								stripe.put(w2, 1.0f);
+								stripe.put(w2, 1);
 							}
 							stripes.put(w1, stripe);
 						} else {
-							HMapStFW stripe = new HMapStFW();
-							stripe.put(w2, 1.0f);
+							HMapStIW stripe = new HMapStIW();
+							stripe.put(w2, 1);
 							stripes.put(w1, stripe);
 						}
 					}
@@ -106,7 +107,7 @@ public class StripesPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyCombiner extends Reducer<Text, LongWritable, Text, LongWritable> {
+	public static final class PreCombiner extends Reducer<Text, LongWritable, Text, LongWritable> {
 		private static final LongWritable COUNT = new LongWritable();
 
 		@Override
@@ -119,6 +120,19 @@ public class StripesPMI extends Configured implements Tool {
 		}
 		COUNT.set(sum);
 		context.write(key, COUNT);
+		}
+	}
+
+	public static final class MyCombiner extends Reducer<Text, HMapStIW, Text, HMapStIW> {
+		@Override
+		public void reduce(Text key, Iterable<HMapStIW> values, Context context)
+		throws IOException, InterruptedException {
+		HMapStIW stripe = new HMapStIW();
+		Iterator<HMapStIW> iter = values.iterator();
+		while (iter.hasNext()) {
+			stripe.plus(iter.next());
+		}
+		context.write(key, stripe);
 		}
 	}
 
@@ -139,8 +153,7 @@ public class StripesPMI extends Configured implements Tool {
 	}
 
 
-	public static final class MyReducer extends Reducer<Text, HMapStFW, Text, HashMap<String, PairOfFloatInt>> {
-		private static final PairOfFloatInt PMIVALUE = new PairOfFloatInt();
+	public static final class MyReducer extends Reducer<Text, HMapStIW, Text, HashMap<String, PairOfFloatInt>> {
 		private static HashMap<String, PairOfFloatInt> stripes = new HashMap<String, PairOfFloatInt>();
 		private static HashMap<String, Integer> counts = new HashMap<String, Integer>();
 		private int lines = 0;
@@ -168,10 +181,10 @@ public class StripesPMI extends Configured implements Tool {
 		}
 
 		@Override
-		public void reduce(Text key, Iterable<HMapStFW> values, Context context)
+		public void reduce(Text key, Iterable<HMapStIW> values, Context context)
 		throws IOException, InterruptedException {
-		HMapStFW stripe = new HMapStFW();
-		Iterator<HMapStFW> iter = values.iterator();
+		HMapStIW stripe = new HMapStIW();
+		Iterator<HMapStIW> iter = values.iterator();
 		while (iter.hasNext()) {
 			stripe.plus(iter.next());
 		}
@@ -183,121 +196,122 @@ public class StripesPMI extends Configured implements Tool {
 				float d2 = counts.get(word);
 				float numerator = stripe.get(word) * lines;
 				float pmi = (float)(Math.log10(numerator / (d1 * d2)));
-				PMIVALUE.set(pmi, stripe.get(word));
-				stripes.put(word, PMIVALUE);
+				PairOfFloatInt pmiValue = new PairOfFloatInt(pmi, count);
+				stripes.put(word, pmiValue);
 			}
 		}
 		context.write(key, stripes);
 		}
-
-		private StripesPMI() {}
-
-		private static final class Args {
-			@Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
-				String input;
-
-			@Option(name = "-output", metaVar = "[path]", required = true, usage = "output path")
-				String output;
-
-			@Option(name = "-reducers", metaVar = "[num]", usage = "number of reducers")
-				int numReducers = 1;
-
-			@Option(name = "-threshold", metaVar = "[num]", usage = "do not show below threshold")
-				int threshold = 10;
-		}
-
-		@Override
-		public int run(String[] argv) throws Exception {
-			final Args args = new Args();
-			CmdLineParser parser = new CmdLineParser(args, ParserProperties.defaults().withUsageWidth(100));
-
-			try {
-				parser.parseArgument(argv);
-			} catch (CmdLineException e) {
-				System.err.println(e.getMessage());
-				parser.printUsage(System.err);
-				return -1;
-			}
-
-			LOG.info("Tool: " + StripesPMI.class.getSimpleName());
-			LOG.info(" - input path: " + args.input);
-			LOG.info(" - output path: " + args.output);
-			LOG.info(" - number of reducers: " + args.numReducers);
-			LOG.info(" - threshold: " + args.threshold);
-
-			Configuration conf = getConf();
-			Job job = Job.getInstance(conf);
-			job.setJobName(StripesPMI.class.getSimpleName());
-			job.setJarByClass(StripesPMI.class);
-
-			job.setNumReduceTasks(args.numReducers);
-
-			FileInputFormat.setInputPaths(job, new Path(args.input));
-			FileOutputFormat.setOutputPath(job, new Path("bin"));
-
-			job.setMapOutputKeyClass(Text.class);
-			job.setMapOutputValueClass(LongWritable.class);
-			job.setOutputKeyClass(Text.class);
-			job.setOutputValueClass(LongWritable.class);
-			job.setOutputFormatClass(SequenceFileOutputFormat.class);
-
-			job.setMapperClass(PreMapper.class);
-			job.setCombinerClass(MyCombiner.class);
-			job.setReducerClass(PreReducer.class);
-
-			job.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
-			job.getConfiguration().set("mapreduce.map.memory.mb", "3072");
-			job.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
-			job.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
-			job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
-
-			// Delete the output directory if it exists already.
-			Path outputDir = new Path("stripesbin");
-			FileSystem.get(conf).delete(outputDir, true);
-
-			long startTime = System.currentTimeMillis();
-			job.waitForCompletion(true);
-			LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
-
-			Job postJob = Job.getInstance(conf);
-			postJob.setJobName(StripesPMI.class.getSimpleName());
-			postJob.setJarByClass(StripesPMI.class);
-
-			postJob.getConfiguration().setInt("threshold", args.threshold);
-			postJob.setNumReduceTasks(args.numReducers);
-
-			FileInputFormat.setInputPaths(postJob, new Path(args.input));
-			FileOutputFormat.setOutputPath(postJob, new Path(args.output));
-
-			postJob.setMapOutputKeyClass(Text.class);
-			postJob.setMapOutputValueClass(HMapStFW.class);
-			postJob.setOutputKeyClass(Text.class);
-			postJob.setOutputValueClass(HashMap<String, HMapStFW>.class);
-			postJob.setOutputFormatClass(TextOutputFormat.class);
-
-			postJob.setMapperClass(MyMapper.class);
-			postJob.setCombinerClass(MyCombiner.class);
-			postJob.setReducerClass(MyReducer.class);
-
-			postJob.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
-			postJob.getConfiguration().set("mapreduce.map.memory.mb", "3072");
-			postJob.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
-			postJob.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
-			postJob.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
-
-			Path postOutputDir = new Path(args.output);
-			FileSystem.get(conf).delete(postOutputDir, true);
-
-			postJob.waitForCompletion(true);
-			LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
-
-			return 0;
-		}
-
-		/**
-		 * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
-		 */
-		public static void main(String[] args) throws Exception {
-			ToolRunner.run(new StripesPMI(), args);
-		}
 	}
+
+	private StripesPMI() {}
+
+	private static final class Args {
+		@Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
+			String input;
+
+		@Option(name = "-output", metaVar = "[path]", required = true, usage = "output path")
+			String output;
+
+		@Option(name = "-reducers", metaVar = "[num]", usage = "number of reducers")
+			int numReducers = 1;
+
+		@Option(name = "-threshold", metaVar = "[num]", usage = "do not show below threshold")
+			int threshold = 10;
+	}
+
+	@Override
+	public int run(String[] argv) throws Exception {
+		final Args args = new Args();
+		CmdLineParser parser = new CmdLineParser(args, ParserProperties.defaults().withUsageWidth(100));
+
+		try {
+			parser.parseArgument(argv);
+		} catch (CmdLineException e) {
+			System.err.println(e.getMessage());
+			parser.printUsage(System.err);
+			return -1;
+		}
+
+		LOG.info("Tool: " + StripesPMI.class.getSimpleName());
+		LOG.info(" - input path: " + args.input);
+		LOG.info(" - output path: " + args.output);
+		LOG.info(" - number of reducers: " + args.numReducers);
+		LOG.info(" - threshold: " + args.threshold);
+
+		Configuration conf = getConf();
+		Job job = Job.getInstance(conf);
+		job.setJobName(StripesPMI.class.getSimpleName());
+		job.setJarByClass(StripesPMI.class);
+
+		job.setNumReduceTasks(args.numReducers);
+
+		FileInputFormat.setInputPaths(job, new Path(args.input));
+		FileOutputFormat.setOutputPath(job, new Path("stripesbin"));
+
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(LongWritable.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(LongWritable.class);
+		job.setOutputFormatClass(SequenceFileOutputFormat.class);
+
+		job.setMapperClass(PreMapper.class);
+		job.setCombinerClass(PreCombiner.class);
+		job.setReducerClass(PreReducer.class);
+
+		job.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
+		job.getConfiguration().set("mapreduce.map.memory.mb", "3072");
+		job.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
+		job.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
+		job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
+
+		// Delete the output directory if it exists already.
+		Path outputDir = new Path("stripesbin");
+		FileSystem.get(conf).delete(outputDir, true);
+
+		long startTime = System.currentTimeMillis();
+		job.waitForCompletion(true);
+		LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+
+		Job postJob = Job.getInstance(conf);
+		postJob.setJobName(StripesPMI.class.getSimpleName());
+		postJob.setJarByClass(StripesPMI.class);
+
+		postJob.getConfiguration().setInt("threshold", args.threshold);
+		postJob.setNumReduceTasks(args.numReducers);
+
+		FileInputFormat.setInputPaths(postJob, new Path(args.input));
+		FileOutputFormat.setOutputPath(postJob, new Path(args.output));
+
+		postJob.setMapOutputKeyClass(Text.class);
+		postJob.setMapOutputValueClass(HMapStIW.class);
+		postJob.setOutputKeyClass(Text.class);
+		postJob.setOutputValueClass(HashMap.class);
+		postJob.setOutputFormatClass(TextOutputFormat.class);
+
+		postJob.setMapperClass(MyMapper.class);
+		postJob.setCombinerClass(MyCombiner.class);
+		postJob.setReducerClass(MyReducer.class);
+
+		postJob.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
+		postJob.getConfiguration().set("mapreduce.map.memory.mb", "3072");
+		postJob.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
+		postJob.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
+		postJob.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
+
+		Path postOutputDir = new Path(args.output);
+		FileSystem.get(conf).delete(postOutputDir, true);
+
+		postJob.waitForCompletion(true);
+		LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+
+		return 0;
+	}
+
+	/**
+	 * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
+	 */
+	public static void main(String[] args) throws Exception {
+		ToolRunner.run(new StripesPMI(), args);
+	}
+}
