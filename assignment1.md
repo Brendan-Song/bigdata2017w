@@ -19,18 +19,48 @@ Final output records
 
 Question 2
 ==========
+Pairs
+-----
+10.091 + 32.897 = 42.988 seconds
+Ran on UW linux environment
+
+Stripes
+-------
+8.141 + 24.013 = 32.154 seconds
+Ran on UW linux environment
 
 Question 3
 ==========
 
 Question 4
 ==========
+37917  151668 1140347
 
 Question 5
 ==========
+Highest PMI
+-----------
+(milford, haven)        (3.6201773, 11)
+(anjou, maine)  (3.5953538, 11)
+
+Lowest PMI
+----------
+(you, thou)     (-1.622328, 12)
+(of, enter)     (-1.411942, 11)
 
 Question 6
 ==========
+tears
+-----
+(tears, are)    (0.19612648, 12)
+(tears, for)    (-0.115245804, 13)
+(tears, his)    (-0.171579, 10)
+
+death
+-----
+(death, life)   (0.36071625, 13)
+(death, hath)   (-0.0070340387, 13)
+(death, or)     (-0.020579664, 15)
 
 Question 7
 ==========

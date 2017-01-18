@@ -32,6 +32,7 @@ import tl.lin.data.pair.PairOfStrings;
 import tl.lin.data.map.HMapStFW;
 import tl.lin.data.map.HMapStIW;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -97,7 +98,9 @@ public class StripesPMI extends Configured implements Tool {
 						}
 					}
 				}
+				found.put(w2, true);
 			}
+			found.put(w1, true);
 		}
 
 		for (String t : stripes.keySet()) {
@@ -154,7 +157,6 @@ public class StripesPMI extends Configured implements Tool {
 
 
 	public static final class MyReducer extends Reducer<Text, HMapStIW, Text, HashMap<String, PairOfFloatInt>> {
-		private static HashMap<String, PairOfFloatInt> stripes = new HashMap<String, PairOfFloatInt>();
 		private static HashMap<String, Integer> counts = new HashMap<String, Integer>();
 		private int lines = 0;
 		private int threshold = 10;
@@ -162,27 +164,34 @@ public class StripesPMI extends Configured implements Tool {
 		@Override
 		public void setup(Context context) throws IOException {
 			threshold = context.getConfiguration().getInt("threshold", 10);
-			String tmpPath = "stripesbin/part-r-00000";
-			Path fp = new Path(tmpPath);
-			FileSystem fs = FileSystem.get(context.getConfiguration());
-			SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
+			File folder = new File("stripesbin/");
+			File[] fileList = folder.listFiles();
+			for (File file : fileList) {
+				if (file.getName().startsWith("part-r-")) {
+					String tmpPath = "stripesbin/" + file.getName();
+					Path fp = new Path(tmpPath);
+					FileSystem fs = FileSystem.get(context.getConfiguration());
+					SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
 
-			Text key = new Text();
-			LongWritable value = new LongWritable();
-			while (reader.next(key, value)) {
-				if (key.toString().equals("*")) {
-					lines = Integer.parseInt(value.toString());
-				} else {
-					counts.put(key.toString(), Integer.parseInt(value.toString()));
+					Text key = new Text();
+					LongWritable value = new LongWritable();
+					while (reader.next(key, value)) {
+						if (key.toString().equals("*")) {
+							lines = Integer.parseInt(value.toString());
+						} else {
+							counts.put(key.toString(), Integer.parseInt(value.toString()));
+						}
+					}
+
+					reader.close();
 				}
 			}
-
-			reader.close();
 		}
 
 		@Override
 		public void reduce(Text key, Iterable<HMapStIW> values, Context context)
 		throws IOException, InterruptedException {
+		HashMap<String, PairOfFloatInt> stripes = new HashMap<String, PairOfFloatInt>();
 		HMapStIW stripe = new HMapStIW();
 		Iterator<HMapStIW> iter = values.iterator();
 		while (iter.hasNext()) {
@@ -200,7 +209,9 @@ public class StripesPMI extends Configured implements Tool {
 				stripes.put(word, pmiValue);
 			}
 		}
-		context.write(key, stripes);
+		if (!stripes.isEmpty()) {
+			context.write(key, stripes);
+		}
 		}
 	}
 

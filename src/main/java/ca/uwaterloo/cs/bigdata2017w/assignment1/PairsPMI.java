@@ -30,6 +30,7 @@ import tl.lin.data.pair.PairOfFloats;
 import tl.lin.data.pair.PairOfFloatInt;
 import tl.lin.data.pair.PairOfStrings;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -40,8 +41,8 @@ public class PairsPMI extends Configured implements Tool {
 	private static final Logger LOG = Logger.getLogger(PairsPMI.class);
 
 	// Count lines and words
-	public static final class PreMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
-		private static final IntWritable ONE = new IntWritable(1);
+	public static final class PreMapper extends Mapper<LongWritable, Text, PairOfStrings, LongWritable> {
+		private static final LongWritable ONE = new LongWritable(1);
 		private static final PairOfStrings PMIKEY = new PairOfStrings();
 
 		@Override
@@ -51,7 +52,7 @@ public class PairsPMI extends Configured implements Tool {
 		List<String> tokens = Tokenizer.tokenize(value.toString());
 
 		for (int i = 0; i < tokens.size() && i < 40; i++) {
-			PMIKEY.set("*", tokens.get(i));
+			PMIKEY.set(tokens.get(i), "*");
 			if (!hash.containsKey(PMIKEY)) {
 				context.write(PMIKEY, ONE);
 				hash.put(PMIKEY, true);
@@ -64,8 +65,8 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
-		private static final IntWritable ONE = new IntWritable(1);
+	public static final class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, LongWritable> {
+		private static final LongWritable ONE = new LongWritable(1);
 		private static final PairOfStrings PMIKEY = new PairOfStrings();
 
 		@Override
@@ -89,14 +90,14 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class MyCombiner extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
-		private static final IntWritable COUNT = new IntWritable();
+	public static final class MyCombiner extends Reducer<PairOfStrings, LongWritable, PairOfStrings, LongWritable> {
+		private static final LongWritable COUNT = new LongWritable();
 
 		@Override
-		public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+		public void reduce(PairOfStrings key, Iterable<LongWritable> values, Context context)
 		throws IOException, InterruptedException {
 		int sum = 0;
-		Iterator<IntWritable> iter = values.iterator();
+		Iterator<LongWritable> iter = values.iterator();
 		while(iter.hasNext()) {
 			sum += iter.next().get();
 		}
@@ -105,14 +106,14 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 
-	public static final class PreReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
-		private static final IntWritable COUNT = new IntWritable();
+	public static final class PreReducer extends Reducer<PairOfStrings, LongWritable, PairOfStrings, LongWritable> {
+		private static final LongWritable COUNT = new LongWritable();
 
 		@Override
-		public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+		public void reduce(PairOfStrings key, Iterable<LongWritable> values, Context context)
 		throws IOException, InterruptedException {
 		int sum = 0;
-		Iterator<IntWritable> iter = values.iterator();
+		Iterator<LongWritable> iter = values.iterator();
 		while(iter.hasNext()) {
 			sum += iter.next().get();
 		}
@@ -122,7 +123,7 @@ public class PairsPMI extends Configured implements Tool {
 	}
 
 
-	public static final class MyReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, PairOfFloatInt> {
+	public static final class MyReducer extends Reducer<PairOfStrings, LongWritable, PairOfStrings, PairOfFloatInt> {
 		private static final PairOfFloatInt PMIVALUE = new PairOfFloatInt();
 		private static HashMap<String, Integer> hash = new HashMap<String, Integer>();
 		private int lines = 0;
@@ -131,32 +132,38 @@ public class PairsPMI extends Configured implements Tool {
 		@Override
 		public void setup(Context context) throws IOException {
 			threshold = context.getConfiguration().getInt("threshold", 10);
-			String tmpPath = "bin/part-r-00000";
+			File folder = new File("pairsbin/");
+			File[] fileList = folder.listFiles();
+			for (File file : fileList) {
+				if (file.getName().startsWith("part-r-")) {
+				String tmpPath = "pairsbin/" + file.getName();
 			Path fp = new Path(tmpPath);
 			FileSystem fs = FileSystem.get(context.getConfiguration());
 			SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
 
 			PairOfStrings key = new PairOfStrings();
-			IntWritable value = new IntWritable();
+			LongWritable value = new LongWritable();
 			while (reader.next(key, value)) {
 				String left = key.getLeftElement();
 				String right = key.getRightElement();
 
-				if (right.equals("*")) {
+				if (left.equals("*")) {
 					lines = Integer.parseInt(value.toString());
 				} else {
-					hash.put(right, Integer.parseInt(value.toString()));
+					hash.put(left, Integer.parseInt(value.toString()));
 				}
 			}
 
 			reader.close();
+			}
+		}
 		}
 
 		@Override
-		public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+		public void reduce(PairOfStrings key, Iterable<LongWritable> values, Context context)
 		throws IOException, InterruptedException {
 		int count = 0;
-		Iterator<IntWritable> iter = values.iterator();
+		Iterator<LongWritable> iter = values.iterator();
 		while (iter.hasNext()) {
 			count += iter.next().get();
 		}
@@ -166,8 +173,8 @@ public class PairsPMI extends Configured implements Tool {
 			float d2 = hash.get(key.getRightElement());
 			float numerator = count * lines;
 			float pmi = (float)(Math.log10(numerator / (d1 * d2)));
-			PMIVALUE.set(pmi, count);
-			context.write(key, PMIVALUE);
+			PairOfFloatInt pmiValue = new PairOfFloatInt(pmi, count);
+			context.write(key, pmiValue);
 		}
 		}
 	}
@@ -215,12 +222,12 @@ public class PairsPMI extends Configured implements Tool {
 		job.setNumReduceTasks(args.numReducers);
 
 		FileInputFormat.setInputPaths(job, new Path(args.input));
-		FileOutputFormat.setOutputPath(job, new Path("bin"));
+		FileOutputFormat.setOutputPath(job, new Path("pairsbin"));
 
 		job.setMapOutputKeyClass(PairOfStrings.class);
-		job.setMapOutputValueClass(IntWritable.class);
+		job.setMapOutputValueClass(LongWritable.class);
 		job.setOutputKeyClass(PairOfStrings.class);
-		job.setOutputValueClass(IntWritable.class);
+		job.setOutputValueClass(LongWritable.class);
 		job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
 		job.setMapperClass(PreMapper.class);
@@ -234,7 +241,7 @@ public class PairsPMI extends Configured implements Tool {
 		job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
 
 		// Delete the output directory if it exists already.
-		Path outputDir = new Path("bin");
+		Path outputDir = new Path("pairsbin");
 		FileSystem.get(conf).delete(outputDir, true);
 
 		long startTime = System.currentTimeMillis();
@@ -252,7 +259,7 @@ public class PairsPMI extends Configured implements Tool {
 		FileOutputFormat.setOutputPath(postJob, new Path(args.output));
 
 		postJob.setMapOutputKeyClass(PairOfStrings.class);
-		postJob.setMapOutputValueClass(IntWritable.class);
+		postJob.setMapOutputValueClass(LongWritable.class);
 		postJob.setOutputKeyClass(PairOfStrings.class);
 		postJob.setOutputValueClass(PairOfFloatInt.class);
 		postJob.setOutputFormatClass(TextOutputFormat.class);
