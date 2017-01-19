@@ -33,6 +33,7 @@ import tl.lin.data.pair.PairOfStrings;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -73,17 +74,21 @@ public class PairsPMI extends Configured implements Tool {
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 		throws IOException, InterruptedException {
-		HashMap<PairOfStrings, Boolean> hash = new HashMap<PairOfStrings, Boolean>();
 		List<String> tokens = Tokenizer.tokenize(value.toString());
 
+		HashMap<String, Boolean> foundLeft = new HashMap<String, Boolean>();
 		for (int i = 0; i < tokens.size() && i < 40; i++) {
-			for (int j = 0; j < tokens.size() && j < 40; j++) {
-				// co-occurring pair
-				if (i != j && !tokens.get(i).equals(tokens.get(j))) {
-					PMIKEY.set(tokens.get(i), tokens.get(j));
-					if (!hash.containsKey(PMIKEY) || !hash.get(PMIKEY)) {
-						context.write(PMIKEY, ONE);
-						hash.put(PMIKEY, true);
+			if (!foundLeft.containsKey(tokens.get(i))) {
+				foundLeft.put(tokens.get(i), true);
+				HashMap<String, Boolean> foundRight = new HashMap<String, Boolean>();
+				for (int j = 0; j < tokens.size() && j < 40; j++) {
+					// co-occurring pair
+					if (i != j && !tokens.get(i).equals(tokens.get(j))) {
+						if (!foundRight.containsKey(tokens.get(j))) {
+							foundRight.put(tokens.get(j), true);
+							PMIKEY.set(tokens.get(i), tokens.get(j));
+							context.write(PMIKEY, ONE);
+						}
 					}
 				}
 			}

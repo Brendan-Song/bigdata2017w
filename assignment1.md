@@ -42,23 +42,23 @@ Ran on UW linux environment
 
 Question 4
 ==========
-37917  151668 1140347
+77198  308792 2327792
 
 Question 5
 ==========
 Highest PMI
 -----------
-(milford, haven)        (3.6201773, 11)
+(maine, anjou)  (3.6331422, 12)
 
-(anjou, maine)  (3.5953538, 11)
+(anjou, maine)  (3.6331422, 12)
 
 This makes sense as these are low volume words of specific locations that are not likely to occur very often on their own.
 
 Lowest PMI
 ----------
-(you, thou)     (-1.622328, 12)
+(thy, you)      (-1.5303967, 11)
 
-(of, enter)     (-1.411942, 11)
+(you, thy)      (-1.5303967, 11)
 
 This makes sense as these words are high volume meaning they will dilute the probability of co-occurring with one another.
 
@@ -66,22 +66,40 @@ Question 6
 ==========
 tears
 -----
-(tears, are)    (0.19612648, 12)
+(tears, shed)   (2.1117902, 15)
 
-(tears, for)    (-0.115245804, 13)
+(tears, salt)   (2.052812, 11)
 
-(tears, his)    (-0.171579, 10)
+(tears, eyes)   (1.165167, 23)
 
 death
 -----
-(death, life)   (0.36071625, 13)
+(death, father's)       (1.120252, 21)
 
-(death, hath)   (-0.0070340387, 13)
+(death, die)    (0.7541594, 18)
 
-(death, or)     (-0.020579664, 15)
+(death, life)   (0.7381346, 31)
 
 Question 7
 ==========
+(hockey, defenceman)    (2.3849285, 141)
+
+(hockey, winger)        (2.3647165, 176)
+
+(hockey, goaltender)    (2.2115955, 184)
+
+(hockey, nhl)   (1.8181567, 638)
+
+(hockey, canadiens)     (1.7610953, 77)
 
 Question 8
 ==========
+(data, storage) (1.8934968, 82)
+
+(data, stored)  (1.7298163, 57)
+
+(data, structure)       (1.4467512, 107)
+
+(data, information)     (1.0224539, 81)
+
+(data, computer)        (0.94461024, 83)
