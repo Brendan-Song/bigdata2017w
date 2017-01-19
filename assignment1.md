@@ -82,24 +82,24 @@ death
 
 Question 7
 ==========
-(hockey, defenceman)    (2.3849285, 141)
+(hockey, defenceman)    (2.4030268, 147)
 
-(hockey, winger)        (2.3647165, 176)
+(hockey, winger)        (2.3863757, 185)
 
-(hockey, goaltender)    (2.2115955, 184)
+(hockey, goaltender)    (2.2434428, 198)
 
-(hockey, nhl)   (1.8181567, 638)
+(hockey, nhl)   (1.9864639, 940)
 
-(hockey, canadiens)     (1.7610953, 77)
+(hockey, men's) (1.9682738, 84)
 
 Question 8
 ==========
-(data, storage) (1.8934968, 82)
+(data, storage) (1.9796829, 100)
 
-(data, stored)  (1.7298163, 57)
+(data, database)        (1.8992721, 97)
 
-(data, structure)       (1.4467512, 107)
+(data, disk)    (1.7935462, 67)
 
-(data, information)     (1.0224539, 81)
+(data, stored)  (1.7868547, 65)
 
-(data, computer)        (0.94461024, 83)
+(data, processing)      (1.6476576, 57)
