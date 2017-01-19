@@ -14,6 +14,8 @@ The input records for the second job will be the output from the first job, coun
 
 Question 2
 ==========
+Note: I ran these before ironing out all bugs, current runtimes are slightly longer.
+
 Pairs
 -----
 10.091 + 32.897 = 42.988 seconds
@@ -28,6 +30,8 @@ Ran on UW linux environment
 
 Question 3
 ==========
+Note: I ran these before ironing out all bugs, current runtimes are slightly longer.
+
 Pairs
 -----
 13.301 + 46.226 = 59.527 seconds
