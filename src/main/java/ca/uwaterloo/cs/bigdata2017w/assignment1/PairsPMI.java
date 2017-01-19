@@ -3,6 +3,7 @@ package ca.uwaterloo.cs.bigdata2017w.assignment1;
 import io.bespin.java.util.Tokenizer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
@@ -132,13 +133,12 @@ public class PairsPMI extends Configured implements Tool {
 		@Override
 		public void setup(Context context) throws IOException {
 			threshold = context.getConfiguration().getInt("threshold", 10);
-			File folder = new File("pairsbin/");
-			File[] fileList = folder.listFiles();
-			for (File file : fileList) {
-				if (file.getName().startsWith("part-r-")) {
-					String tmpPath = "pairsbin/" + file.getName();
-					Path fp = new Path(tmpPath);
-					FileSystem fs = FileSystem.get(context.getConfiguration());
+			Path path = new Path("pairsbin");
+			FileSystem fs = FileSystem.get(context.getConfiguration());
+			FileStatus[] fileList = fs.listStatus(path);
+			for (FileStatus file : fileList) {
+				if (!file.isDir() && file.getPath().toString().contains("pairsbin/part-r-")) {
+					Path fp = file.getPath();
 					SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
 
 					PairOfStrings key = new PairOfStrings();
