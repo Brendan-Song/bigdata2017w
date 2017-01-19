@@ -136,27 +136,27 @@ public class PairsPMI extends Configured implements Tool {
 			File[] fileList = folder.listFiles();
 			for (File file : fileList) {
 				if (file.getName().startsWith("part-r-")) {
-				String tmpPath = "pairsbin/" + file.getName();
-			Path fp = new Path(tmpPath);
-			FileSystem fs = FileSystem.get(context.getConfiguration());
-			SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
+					String tmpPath = "pairsbin/" + file.getName();
+					Path fp = new Path(tmpPath);
+					FileSystem fs = FileSystem.get(context.getConfiguration());
+					SequenceFile.Reader reader = new SequenceFile.Reader(context.getConfiguration(), SequenceFile.Reader.file(fp));
 
-			PairOfStrings key = new PairOfStrings();
-			LongWritable value = new LongWritable();
-			while (reader.next(key, value)) {
-				String left = key.getLeftElement();
-				String right = key.getRightElement();
+					PairOfStrings key = new PairOfStrings();
+					LongWritable value = new LongWritable();
+					while (reader.next(key, value)) {
+						String left = key.getLeftElement();
+						String right = key.getRightElement();
 
-				if (left.equals("*")) {
-					lines = Integer.parseInt(value.toString());
-				} else {
-					hash.put(left, Integer.parseInt(value.toString()));
+						if (left.equals("*")) {
+							lines = Integer.parseInt(value.toString());
+						} else {
+							hash.put(left, Integer.parseInt(value.toString()));
+						}
+					}
+
+					reader.close();
 				}
 			}
-
-			reader.close();
-			}
-		}
 		}
 
 		@Override
