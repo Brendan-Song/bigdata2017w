@@ -114,6 +114,9 @@ object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with W
 		log.info("Input: " + args.input())
 		log.info("Output: " + args.output())
 		log.info("Number of reducers: " + args.reducers())
+		log.info("Number of executors: " + args.executors())
+		log.info("Number of cores: " + args.cores())
+		log.info("Amount of memory: " + args.memory())
 
 
 		val conf = getConf()
