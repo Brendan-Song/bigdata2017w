@@ -48,6 +48,7 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
 		log.info("Number of cores: " + args.cores())
 
 		val conf = new SparkConf().setAppName("Compute Bigram Relative Frequency Pairs")
+
 		val sc = new SparkContext(conf)
 		
 		val outputDir = new Path(args.output())

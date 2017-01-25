@@ -3,6 +3,7 @@ package ca.uwaterloo.cs.bigdata2017w.assignment2
 import io.bespin.scala.util.Tokenizer
 import io.bespin.scala.util.WritableConversions
 
+import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.collection.mutable._
 
@@ -15,81 +16,18 @@ import org.apache.hadoop.mapreduce.lib.output._
 import org.apache.hadoop.util.Tool
 import org.apache.hadoop.util.ToolRunner
 import org.apache.log4j._
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
 import org.rogach.scallop._
 import tl.lin.data.map.HMapStFW
 import tl.lin.data.map.HMapStIW
 import tl.lin.data.map.MapKF
 import tl.lin.data.pair.PairOfStrings
-/*
-object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with WritableConversions with Tokenizer {
-	val log = Logger.getLogger(getClass.getName)
 
-	class MyMapper extends Mapper[LongWritable, Text, Text, HMapStFW] {
-		val TEXT = new Text()
-		override def map(key: LongWritable, value: Text,
-			context: Mapper[LongWritable, Text, Text, HMapStFW]#Context) = {
-				val stripes = new HashMap[String, HMapStFW]()
-				val words = tokenize(value)
-				for(i <- 1 until words.length) {
-					var prev = words(i-1)
-					var curr = words(i)
-					if (stripes.contains(prev)) {
-						val stripe = stripes.get(prev)
-						if (stripe.contains(curr)) {
-							stripe.put(curr, stripe.get(curr) + 1.0f)
-						} else {
-							stripe.put(curr, 1.0f)
-						}
-					} else {
-						stripe = new HMapStFW()
-						stripe.put(curr, 1.0f)
-						stripes.put(prev, stripe)
-					}
-				}
-				
-				for ((k, v) <- stripes) {
-					TEXT.set(k)
-					context.write(TEXT, v)
-				}
-		}
-	}
+object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
+	val log = Logger.getLogger(getClass().getName())
 
-       	class MyCombiner extends Reducer[Text, HMapStFW, Text, HMapStFW] {
-		val SUM = new FloatWritable()
-
-		override def reduce(key: Text, values: java.lang.Iterable[HMapStFW],
-			context: Reducer[Text, HMapStFW, Text, HMapStFW]#Context) = {
-				val map = new HMapStFW()
-				for (value <- values.asScala) {
-					map.plus(value)
-				}
-				context.write(key, map)
-		}
-	}
-
-	class MyReducer extends Reducer[Text, HMapStFW, Text, HMapStFW] {
-		val VALUE = new FloatWritable()
-		var marginal = 0.0f
-		override def reduce(key: Text, values: java.lang.Iterable[HMapStFW],
-			context: Reducer[Text, HMapStFW, Text, HMapStFW]#Context) = {
-				val map = new HMapStFW()
-				for (value <- values.asScala) {
-					map.plus(value)
-				}
-
-				var sum = 0.0f
-				for ((k, v) <- map) {
-					sum += v.getValue()
-				}
-				for ((k, v) <- map) {
-					map.put(k, v / sum)
-				}
-				
-				context.write(key, map)
-		}
-	}
-
-	override def run(argv: Array[String]) : Int = {
+	def main(argv: Array[String]) {
 		val args = new Conf(argv)
 
 		log.info("Input: " + args.input())
@@ -97,44 +35,91 @@ object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with W
 		log.info("Number of reducers: " + args.reducers())
 		log.info("Number of executors: " + args.executors())
 		log.info("Number of cores: " + args.cores())
-		log.info("Amount of memory: " + args.memory())
 
-
-		val conf = getConf()
-		val job = Job.getInstance(conf)
-
-		FileInputFormat.addInputPath(job, new Path(args.input()))
-		FileOutputFormat.setOutputPath(job, new Path(args.output()))
-
-		job.setJobName("Compute Bigram Relative Frequency Stripes")
-		job.setJarByClass(this.getClass)
-
-		job.setMapOutputKeyClass(classOf[Text])
-		job.setMapOutputValueClass(classOf[HMapStFW])
-		job.setOutputKeyClass(classOf[Text])
-		job.setOutputValueClass(classOf[HMapStFW])
-		job.setOutputFormatClass(classOf[TextOutputFormat[Text, HMapStFW]])
-
-		job.setMapperClass(classOf[MyMapper])
-		job.setCombinerClass(classOf[MyCombiner])
-		job.setReducerClass(classOf[MyReducer])
-
-		job.setNumReduceTasks(args.reducers())
+		val conf = new SparkConf().setAppName("Compute Bigram Relative Frequency Stripes")
+		val sc = new SparkContext(conf)
 
 		val outputDir = new Path(args.output())
-		FileSystem.get(conf).delete(outputDir, true)
+		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
 
-		val startTime = System.currentTimeMillis()
-		job.waitForCompletion(true)
-		
-		log.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds")
-		println("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds")
+		val textFile = sc.textFile(args.input())
 
-		return 0
-	}
-
-	def main(args: Array[String]) {
-		ToolRunner.run(this, args)
+		val counts = textFile
+			// map 2 adjacent words
+			.flatMap(line => {
+				val stripes: Map[String, HMapStFW] = Map()
+				val tokens = tokenize(line)
+				if (tokens.length > 1) {
+					for (i <- 1 until tokens.length) {
+						val prev = tokens(i-1)
+						val curr = tokens(i)
+						if (stripes.contains(prev)) {
+							val stripe = stripes.get(prev)
+							if (stripe.contains(curr)) {
+								stripe.get.put(curr, stripe.get.get(curr) + 1.0f)
+							} else {
+								stripe.get.put(curr, 1.0f)
+							}
+						} else {
+							val stripe = new HMapStFW()
+							stripe.put(curr, 1.0f)
+							stripes.put(prev, stripe)
+						}
+					}
+				}
+				val data = for ((k, v) <- stripes) yield {
+					(k, v)
+				}
+				data
+			})
+			.reduceByKey((key, value) => {
+				val m = new HMapStFW()
+				m.plus(value)
+				m
+			})
+				.map{case (text, value) => {
+					(text, value)
+				}}
+			/*.map{case (text, value) => {
+				var sum = 0.0f
+				val m = new HMapStFW()
+				for ((k:String, v:Float) <- value) {
+					sum = sum + v
+				}
+				for ((k:String, v:Float) <- value) {
+					m.put(k, (v / sum))
+				}
+				(text, m)
+			}}*/
+			.saveAsTextFile(args.output())
+			/*
+			// separate adjacent words and count
+			.flatMap(pair => {
+				val words = pair.split(" ")
+				val pairCount = new Pair[String, String](words(0), words(1))
+				val wordCount = new Pair[String, String](words(0), "*")
+				new Pair[Pair[String, String], Int](wordCount, 1) :: List(new Pair[Pair[String, String], Int](pairCount, 1))
+			})
+			// start combining pairs
+			.reduceByKey(_ + _)
+			// sort to get counts first
+			.repartitionAndSortWithinPartitions(new PairsPartitioner(args.reducers()))
+			// calculate and emit frequencies
+			.map{ case ((w1, w2), value) => {
+				if (w2 == "*") {
+					marginal = value
+					freq = value.toFloat
+				} else {
+					freq = (value.toFloat / marginal.toFloat)
+				}
+				((w1, w2), freq)
+			}}
+			// get it to the right format
+			.map{ case ((w1, w2), freq) => {
+				"(" + w1 + ", " + w2 + "), " + freq
+				}
+			}
+			// save parts
+			.saveAsTextFile(args.output())*/
 	}
 }
-*/
