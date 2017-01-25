@@ -15,128 +15,79 @@ import org.apache.hadoop.mapreduce.lib.output._
 import org.apache.hadoop.util.Tool
 import org.apache.hadoop.util.ToolRunner
 import org.apache.log4j._
+import org.apache.spark.Partitioner
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
 import org.rogach.scallop._
 import tl.lin.data.pair.PairOfStrings
 
-object ComputeBigramRelativeFrequencyPairs extends Configured with Tool with WritableConversions with Tokenizer {
-	val log = Logger.getLogger(getClass.getName)
-	val BIGRAM = new PairOfStrings()
-	val ONE = new FloatWritable(1)
-
-	class MyMapper extends Mapper[LongWritable, Text, PairOfStrings, FloatWritable] {
-		override def map(key: LongWritable, value: Text,
-			context: Mapper[LongWritable, Text, PairOfStrings, FloatWritable]#Context) = {
-				val words = tokenize(value)
-				for(i <- 1 until words.length) {
-					BIGRAM.set(words(i-1), words(i))
-					context.write(BIGRAM, ONE)
-
-					BIGRAM.set(words(i-1), "*")
-					context.write(BIGRAM, ONE)
-				}
-		}
+class PairsPartitioner(val partitions: Int) extends Partitioner {
+	def getPartition(key: Any): Int = {
+		val k = key.asInstanceOf[Pair[String, String]]
+		(k._1.hashCode & Integer.MAX_VALUE) % partitions
 	}
 
-	// Same as above, except using explicit loops to look more like pseudo-code
-	/*class AlternativeMapperIMC extends Mapper[LongWritable, Text, Text, IntWritable] {
-		val counts = new HashMap[String, Int]().withDefaultValue(0)
-
-		override def map(key: LongWritable, value: Text,
-			context: Mapper[LongWritable, Text, Text, IntWritable]#Context) = {
-				for (word <- tokenize(value)) {
-					counts(word) += 1
-				}
-		}
-
-    override def cleanup(context: Mapper[LongWritable, Text, Text, IntWritable]#Context) = {
-	    for ((k, v) <- counts) {
-		    context.write(k, v)
-	    }
-    }
-	}*/
-
-       	class MyCombiner extends Reducer[PairOfStrings, FloatWritable, PairOfStrings, FloatWritable] {
-		val SUM = new FloatWritable()
-
-		override def reduce(key: PairOfStrings, values: java.lang.Iterable[FloatWritable],
-			context: Reducer[PairOfStrings, FloatWritable, PairOfStrings, FloatWritable]#Context) = {
-				var sum = 0.0f
-				for (value <- values.asScala) {
-					sum += value
-				}
-				SUM.set(sum)
-				context.write(key, SUM)
-		}
+	def numPartitions(): Int = {
+		partitions
 	}
+}
 
-	class MyReducer extends Reducer[PairOfStrings, FloatWritable, PairOfStrings, FloatWritable] {
-		val VALUE = new FloatWritable()
-		var marginal = 0.0f
-		override def reduce(key: PairOfStrings, values: java.lang.Iterable[FloatWritable],
-			context: Reducer[PairOfStrings, FloatWritable, PairOfStrings, FloatWritable]#Context) = {
-				var sum = 0.0f
-				for (value <- values.asScala) {
-					sum += value
-				}
+object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
+	val log = Logger.getLogger(getClass().getName())
 
-				if (key.getRightElement().equals("*")) {
-					VALUE.set(sum)
-					context.write(key, VALUE)
-					marginal = sum
-				} else {
-					VALUE.set(sum / marginal)
-					context.write(key, VALUE)
-				}
-		}
-	}
-
-	class MyPartitioner extends Partitioner[PairOfStrings, FloatWritable] {
-		override def getPartition(key: PairOfStrings, value: FloatWritable, numReduceTasks: Int): Int = {
-			return (key.getLeftElement.hashCode & Integer.MAX_VALUE) % numReduceTasks
-		}
-	}
-
-	override def run(argv: Array[String]) : Int = {
+	def main(argv: Array[String]) {
 		val args = new Conf(argv)
+
+		var marginal = 0
+		var freq = 0.0f
 
 		log.info("Input: " + args.input())
 		log.info("Output: " + args.output())
 		log.info("Number of reducers: " + args.reducers())
+		log.info("Number of executors: " + args.executors())
+		log.info("Number of cores: " + args.cores())
 
-
-		val conf = getConf()
-		val job = Job.getInstance(conf)
-
-		FileInputFormat.addInputPath(job, new Path(args.input()))
-		FileOutputFormat.setOutputPath(job, new Path(args.output()))
-
-		job.setJobName("Compute Bigram Relative Frequency Pairs")
-		job.setJarByClass(this.getClass)
-
-		job.setMapOutputKeyClass(classOf[PairOfStrings])
-		job.setMapOutputValueClass(classOf[FloatWritable])
-		job.setOutputKeyClass(classOf[PairOfStrings])
-		job.setOutputValueClass(classOf[FloatWritable])
-		job.setOutputFormatClass(classOf[TextOutputFormat[PairOfStrings, FloatWritable]])
-
-		job.setMapperClass(classOf[MyMapper])
-		job.setCombinerClass(classOf[MyCombiner])
-		job.setReducerClass(classOf[MyReducer])
-		job.setPartitionerClass(classOf[MyPartitioner])
-
-		job.setNumReduceTasks(args.reducers())
-
+		val conf = new SparkConf().setAppName("Compute Bigram Relative Frequency Pairs")
+		val sc = new SparkContext(conf)
+		
 		val outputDir = new Path(args.output())
-		FileSystem.get(conf).delete(outputDir, true)
+		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
 
-		val startTime = System.currentTimeMillis()
-		job.waitForCompletion(true)
-		println("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds")
+		val textFile = sc.textFile(args.input())
 
-		return 0
-	}
-
-	def main(args: Array[String]) {
-		ToolRunner.run(this, args)
+		val counts = textFile
+				// map 2 adjacent words
+				.flatMap(line => {
+					val tokens = tokenize(line)
+					if (tokens.length > 1) tokens.sliding(2).map(p => p.mkString(" ")).toList else List()
+				})
+				// separate adjacent words and count
+				.flatMap(pair => {
+					val words = pair.split(" ")
+					val pairCount = new Pair[String, String](words(0), words(1))
+					val wordCount = new Pair[String, String](words(0), "*")
+					new Pair[Pair[String, String], Int](wordCount, 1) :: List(new Pair[Pair[String, String], Int](pairCount, 1))
+				})
+				// start combining pairs
+				.reduceByKey(_ + _)
+				// sort to get counts first
+				.repartitionAndSortWithinPartitions(new PairsPartitioner(args.reducers()))
+				// calculate and emit frequencies
+				.map{ case ((w1, w2), value) => {
+					if (w2 == "*") {
+						marginal = value
+						freq = value.toFloat
+					} else {
+						freq = (value.toFloat / marginal.toFloat)
+					}
+					((w1, w2), freq)
+				}}
+				// get it to the right format
+				.map{ case ((w1, w2), freq) => {
+						"(" + w1 + ", " + w2 + "), " + freq
+					}
+				}
+				// save parts
+				.saveAsTextFile(args.output())
 	}
 }

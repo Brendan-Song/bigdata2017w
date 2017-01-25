@@ -26,6 +26,5 @@ class Conf(args: Seq[String]) extends ScallopConf(args) {
   val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
   val executors = opt[Int](descr = "number of executors", required = false, default = Some(1))
   val cores = opt[Int](descr = "number of executor cores", required = false, default = Some(1))
-  val memory = opt[String](descr = "amount of executor memory", required = false, default = "4G")
   verify()
 }

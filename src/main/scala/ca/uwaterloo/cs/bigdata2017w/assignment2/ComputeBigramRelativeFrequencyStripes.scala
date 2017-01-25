@@ -20,7 +20,7 @@ import tl.lin.data.map.HMapStFW
 import tl.lin.data.map.HMapStIW
 import tl.lin.data.map.MapKF
 import tl.lin.data.pair.PairOfStrings
-
+/*
 object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with WritableConversions with Tokenizer {
 	val log = Logger.getLogger(getClass.getName)
 
@@ -34,7 +34,7 @@ object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with W
 					var prev = words(i-1)
 					var curr = words(i)
 					if (stripes.contains(prev)) {
-						stripe = stripes.get(prev)
+						val stripe = stripes.get(prev)
 						if (stripe.contains(curr)) {
 							stripe.put(curr, stripe.get(curr) + 1.0f)
 						} else {
@@ -51,27 +51,8 @@ object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with W
 					TEXT.set(k)
 					context.write(TEXT, v)
 				}
-				}
 		}
 	}
-
-	// Same as above, except using explicit loops to look more like pseudo-code
-	/*class AlternativeMapperIMC extends Mapper[LongWritable, Text, Text, IntWritable] {
-		val counts = new HashMap[String, Int]().withDefaultValue(0)
-
-		override def map(key: LongWritable, value: Text,
-			context: Mapper[LongWritable, Text, Text, IntWritable]#Context) = {
-				for (word <- tokenize(value)) {
-					counts(word) += 1
-				}
-		}
-
-    override def cleanup(context: Mapper[LongWritable, Text, Text, IntWritable]#Context) = {
-	    for ((k, v) <- counts) {
-		    context.write(k, v)
-	    }
-    }
-	}*/
 
        	class MyCombiner extends Reducer[Text, HMapStFW, Text, HMapStFW] {
 		val SUM = new FloatWritable()
@@ -156,3 +137,4 @@ object ComputeBigramRelativeFrequencyStripes extends Configured with Tool with W
 		ToolRunner.run(this, args)
 	}
 }
+*/
