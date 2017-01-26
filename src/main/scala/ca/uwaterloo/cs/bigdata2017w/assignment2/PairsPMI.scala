@@ -22,17 +22,6 @@ import org.apache.spark.SparkConf
 import org.rogach.scallop._
 import tl.lin.data.pair.PairOfStrings
 
-/*class PairsPartitioner(val partitions: Int) extends Partitioner {
-	def getPartition(key: Any): Int = {
-		val k = key.asInstanceOf[Pair[String, String]]
-		(k._1.hashCode & Integer.MAX_VALUE) % partitions
-	}
-
-	def numPartitions(): Int = {
-		partitions
-	}
-}*/
-
 object PairsPMI extends Tokenizer {
 	val log = Logger.getLogger(getClass().getName())
 
@@ -56,7 +45,7 @@ object PairsPMI extends Tokenizer {
 		val threshold = args.threshold()
 
 		val counts = textFile
-		// map 2 adjacent words
+		// count words
 		.flatMap(line => {
 			val tokens = tokenize(line)
 			val words: Set[String] = Set()
@@ -74,13 +63,11 @@ object PairsPMI extends Tokenizer {
 			output.toList
 		})
 		.reduceByKey(_ + _)
-		//.map{ case ((w1, w2), count) => {
-		//	"(" + w1 + ", " + w2 + "), " + count
-		//}}
 
 		val countsBroadcast = sc.broadcast(counts.collectAsMap())
 
 		val pmi = textFile
+		// count pairs
 		.flatMap(line => {
 			val tokens = tokenize(line)
 			val foundLeft: Set[String] = Set()
@@ -102,7 +89,9 @@ object PairsPMI extends Tokenizer {
 			output.toList
 		})
 		.reduceByKey(_ + _)
+		// account for threshold
 		.filter{ case ((w1, w2), value) => value.toInt >= threshold }
+		// calculate PMIs
 		.map{ case ((w1, w2), value) => {
 			val count: Int = countsBroadcast.value.get(new Pair[String, String]("*", "*")).get
 			val d1: Int = countsBroadcast.value.get(new Pair[String, String](w1.toString, "*")).get
@@ -112,37 +101,6 @@ object PairsPMI extends Tokenizer {
 			val pmiValue = new Pair[Float, Int](pmiF, value)
 			"(" + w1 + "," + w2 + ") (" + pmiF + "," + value + ")"
 		}}
-//		.collect{ case ((w1, w2), (pmi, count)) if (count.toInt >= args.threshold()) => {
-//			"(" + w1 + "," + w2 + ") (" + pmi + "," + count + ")" 
-//		}}
 		.saveAsTextFile(args.output())
-		// separate adjacent words and count
-		/*
-		.flatMap(pair => {
-			val words = pair.split(" ")
-			val pairCount = new Pair[String, String](words(0), words(1))
-			val wordCount = new Pair[String, String](words(0), "*")
-			new Pair[Pair[String, String], Int](wordCount, 1) :: List(new Pair[Pair[String, String], Int](pairCount, 1))
-		})
-		// start combining pairs
-		.reduceByKey(_ + _)
-		// sort to get counts first
-		.repartitionAndSortWithinPartitions(new PairsPartitioner(args.reducers()))
-		// calculate and emit frequencies
-		.map{ case ((w1, w2), value) => {
-			if (w2 == "*") {
-				marginal = value
-				freq = value.toFloat
-			} else {
-				freq = (value.toFloat / marginal.toFloat)
-			}
-			((w1, w2), freq)
-		}}
-		// get it to the right format
-		.map{ case ((w1, w2), freq) => {
-			"(" + w1 + ", " + w2 + "), " + freq
-		}}
-		// save parts
-		.saveAsTextFile(args.output())*/
 	}
 }

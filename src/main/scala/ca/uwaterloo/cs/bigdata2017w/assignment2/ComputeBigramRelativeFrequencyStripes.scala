@@ -16,6 +16,7 @@ import org.apache.hadoop.mapreduce.lib.output._
 import org.apache.hadoop.util.Tool
 import org.apache.hadoop.util.ToolRunner
 import org.apache.log4j._
+import org.apache.spark.Partitioner
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.rogach.scallop._
@@ -43,9 +44,9 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 		val textFile = sc.textFile(args.input())
 
 		val counts = textFile
-			// map 2 adjacent words
+			// map words
 			.flatMap(line => {
-				val stripes: Map[String, HMapStFW] = Map()
+				val stripes: Map[String, Map[String, Float]] = Map()
 				val tokens = tokenize(line)
 				if (tokens.length > 1) {
 					for (i <- 1 until tokens.length) {
@@ -54,12 +55,13 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 						if (stripes.contains(prev)) {
 							val stripe = stripes.get(prev)
 							if (stripe.contains(curr)) {
-								stripe.get.put(curr, stripe.get.get(curr) + 1.0f)
+								val c = stripe.get.get(curr) 
+								stripe.get.put(curr, c.get + 1.0f)
 							} else {
 								stripe.get.put(curr, 1.0f)
 							}
 						} else {
-							val stripe = new HMapStFW()
+							val stripe: Map[String, Float] = Map()
 							stripe.put(curr, 1.0f)
 							stripes.put(prev, stripe)
 						}
@@ -70,54 +72,47 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 				}
 				data
 			})
-			.reduceByKey((key, value) => {
-				val m = new HMapStFW()
-				m.plus(value)
+			// reduce maps - essentially HMapStFW.plus()
+			.reduceByKey((m1, m2) => {
+				val m: Map[String, Float] = Map()
+				for ((k, v) <- m1) {
+					if (m.contains(k)) {
+						m.put(k, m.get(k).get + v)
+					} else {
+						m.put(k, v)
+					}
+				}
+				for ((k, v) <- m2) {
+					if (m.contains(k)) {
+						m.put(k, m.get(k).get + v)
+					} else {
+						m.put(k, v)
+					}
+				}
 				m
 			})
-				.map{case (text, value) => {
-					(text, value)
-				}}
-			/*.map{case (text, value) => {
+			// sort
+			.sortByKey(true, args.reducers())
+			// calculate frequencies
+			.map{case (key, values) => {
 				var sum = 0.0f
-				val m = new HMapStFW()
-				for ((k:String, v:Float) <- value) {
+				val m: Map[String, Float] = Map()
+				for ((k, v) <- values) {
 					sum = sum + v
 				}
-				for ((k:String, v:Float) <- value) {
+				for ((k, v) <- values) {
 					m.put(k, (v / sum))
 				}
-				(text, m)
-			}}*/
-			.saveAsTextFile(args.output())
-			/*
-			// separate adjacent words and count
-			.flatMap(pair => {
-				val words = pair.split(" ")
-				val pairCount = new Pair[String, String](words(0), words(1))
-				val wordCount = new Pair[String, String](words(0), "*")
-				new Pair[Pair[String, String], Int](wordCount, 1) :: List(new Pair[Pair[String, String], Int](pairCount, 1))
-			})
-			// start combining pairs
-			.reduceByKey(_ + _)
-			// sort to get counts first
-			.repartitionAndSortWithinPartitions(new PairsPartitioner(args.reducers()))
-			// calculate and emit frequencies
-			.map{ case ((w1, w2), value) => {
-				if (w2 == "*") {
-					marginal = value
-					freq = value.toFloat
-				} else {
-					freq = (value.toFloat / marginal.toFloat)
-				}
-				((w1, w2), freq)
+				(key, m)
 			}}
 			// get it to the right format
-			.map{ case ((w1, w2), freq) => {
-				"(" + w1 + ", " + w2 + "), " + freq
+			.map{case (key, m) => {
+				var str: String = ""
+				for ((k, v) <- m) {
+					str = str + k + "=" + v + ", "
 				}
-			}
-			// save parts
-			.saveAsTextFile(args.output())*/
+				"" + key + " {" + str.dropRight(2) + "}"
+			}}
+			.saveAsTextFile(args.output())
 	}
 }
