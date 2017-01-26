@@ -91,8 +91,6 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 				}
 				m
 			})
-			// sort
-			.sortByKey(true, args.reducers())
 			// calculate frequencies
 			.map{case (key, values) => {
 				var sum = 0.0f

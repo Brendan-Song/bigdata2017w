@@ -32,7 +32,7 @@ object PairsPMI extends Tokenizer {
 		log.info("Output: " + args.output())
 		log.info("Number of reducers: " + args.reducers())
 
-		val conf = new SparkConf().setAppName("Compute Bigram Relative Frequency Pairs")
+		val conf = new SparkConf().setAppName("Pairs PMI")
 
 		val sc = new SparkContext(conf)
 
