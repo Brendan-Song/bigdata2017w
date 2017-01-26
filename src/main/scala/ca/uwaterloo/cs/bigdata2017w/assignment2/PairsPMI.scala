@@ -5,6 +5,7 @@ import io.bespin.scala.util.WritableConversions
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable._
+import scala.math._
 
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs._
@@ -38,14 +39,9 @@ object PairsPMI extends Tokenizer {
 	def main(argv: Array[String]) {
 		val args = new Conf(argv)
 
-		var marginal = 0
-		var freq = 0.0f
-
 		log.info("Input: " + args.input())
 		log.info("Output: " + args.output())
 		log.info("Number of reducers: " + args.reducers())
-		log.info("Number of executors: " + args.executors())
-		log.info("Number of cores: " + args.cores())
 
 		val conf = new SparkConf().setAppName("Compute Bigram Relative Frequency Pairs")
 
@@ -56,6 +52,8 @@ object PairsPMI extends Tokenizer {
 
 		val textFile = sc.textFile(args.input())
 		val accum = sc.longAccumulator("Line count")
+
+		val threshold = args.threshold()
 
 		val counts = textFile
 		// map 2 adjacent words
@@ -86,7 +84,7 @@ object PairsPMI extends Tokenizer {
 		.flatMap(line => {
 			val tokens = tokenize(line)
 			val foundLeft: Set[String] = Set()
-			val output: ListBuffer[Pair[Pair[String, String], Float]] = ListBuffer()
+			val output: ListBuffer[Pair[Pair[String, String], Int]] = ListBuffer()
 			for (i <- 0 until tokens.length if i < 40) {
 				if (!foundLeft(tokens(i))) {
 					foundLeft += tokens(i)
@@ -95,7 +93,7 @@ object PairsPMI extends Tokenizer {
 						if (i != j && !(tokens(i) == tokens(j))) {
 							if (!foundRight(tokens(j))) {
 								foundRight += tokens(j)
-								output += new Pair[Pair[String, String], Float](new Pair[String, String](tokens(i), tokens(j)), 1.0f)
+								output += new Pair[Pair[String, String], Int](new Pair[String, String](tokens(i), tokens(j)), 1)
 							}
 						}
 					}
@@ -103,6 +101,20 @@ object PairsPMI extends Tokenizer {
 			}
 			output.toList
 		})
+		.reduceByKey(_ + _)
+		.filter{ case ((w1, w2), value) => value.toInt >= threshold }
+		.map{ case ((w1, w2), value) => {
+			val count: Int = countsBroadcast.value.get(new Pair[String, String]("*", "*")).get
+			val d1: Int = countsBroadcast.value.get(new Pair[String, String](w1.toString, "*")).get
+			val d2: Int = countsBroadcast.value.get(new Pair[String, String](w2.toString, "*")).get
+			val numerator = count * value.toInt
+			val pmiF = log10(numerator.toFloat / (d1.toFloat * d2.toFloat)).toFloat
+			val pmiValue = new Pair[Float, Int](pmiF, value)
+			"(" + w1 + "," + w2 + ") (" + pmiF + "," + value + ")"
+		}}
+//		.collect{ case ((w1, w2), (pmi, count)) if (count.toInt >= args.threshold()) => {
+//			"(" + w1 + "," + w2 + ") (" + pmi + "," + count + ")" 
+//		}}
 		.saveAsTextFile(args.output())
 		// separate adjacent words and count
 		/*

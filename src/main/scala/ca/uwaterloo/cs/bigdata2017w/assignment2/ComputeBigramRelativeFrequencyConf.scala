@@ -20,11 +20,10 @@ import org.apache.log4j._
 import org.rogach.scallop._
 
 class Conf(args: Seq[String]) extends ScallopConf(args) {
-  mainOptions = Seq(input, output, reducers)
+  mainOptions = Seq(input, output, reducers, threshold)
   val input = opt[String](descr = "input path", required = true)
   val output = opt[String](descr = "output path", required = true)
   val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
-  val executors = opt[Int](descr = "number of executors", required = false, default = Some(1))
-  val cores = opt[Int](descr = "number of executor cores", required = false, default = Some(1))
+  val threshold = opt[Int](descr = "minimum count", required = false, default = Some(10))
   verify()
 }
