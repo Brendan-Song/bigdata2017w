@@ -46,31 +46,14 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 		val counts = textFile
 			// map words
 			.flatMap(line => {
-				val stripes: Map[String, Map[String, Float]] = Map()
+				val stripe: Map[String, Float] = Map()
 				val tokens = tokenize(line)
 				if (tokens.length > 1) {
-					for (i <- 1 until tokens.length) {
-						val prev = tokens(i-1)
-						val curr = tokens(i)
-						if (stripes.contains(prev)) {
-							val stripe = stripes.get(prev)
-							if (stripe.contains(curr)) {
-								val c = stripe.get.get(curr) 
-								stripe.get.put(curr, c.get + 1.0f)
-							} else {
-								stripe.get.put(curr, 1.0f)
-							}
-						} else {
-							val stripe: Map[String, Float] = Map()
-							stripe.put(curr, 1.0f)
-							stripes.put(prev, stripe)
-						}
-					}
-				}
-				val data = for ((k, v) <- stripes) yield {
-					(k, v)
-				}
-				data
+					tokens.sliding(2).map(p => {
+						stripe.put(p(1), 1.0f)
+						(p(0), stripe)
+					})
+				} else List()
 			})
 			// reduce maps - essentially HMapStFW.plus()
 			.reduceByKey((m1, m2) => {
@@ -101,10 +84,8 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
 				for ((k, v) <- values) {
 					m.put(k, (v / sum))
 				}
-				(key, m)
-			}}
-			// get it to the right format
-			.map{case (key, m) => {
+
+				//get it to the right format
 				var str: String = ""
 				for ((k, v) <- m) {
 					str = str + k + "=" + v + ", "
