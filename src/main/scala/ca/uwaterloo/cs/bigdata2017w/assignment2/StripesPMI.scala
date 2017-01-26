@@ -126,17 +126,21 @@ object StripesPMI extends Tokenizer {
 		// calculate PMIs
 		.map{case (key, values) => {
 			val m: Map[String, Pair[Float, Int]] = Map()
-			for ((k, v) <- values) { 
-				val lines: Int = countsBroadcast.value.get("*").get
-				val d1: Int = countsBroadcast.value.get(key).get
-				val d2: Int = countsBroadcast.value.get(k).get
-				val numerator = v * lines
-				val pmiF = log10(numerator.toFloat / (d1.toFloat * d2.toFloat)).toFloat
-				val pmiValue = new Pair[Float, Int](pmiF, v)
-				m.put(k, pmiValue)
+			for ((k, v) <- values) {
+				if (v >= threshold) {
+					val lines: Int = countsBroadcast.value.get("*").get
+					val d1: Int = countsBroadcast.value.get(key).get
+					val d2: Int = countsBroadcast.value.get(k).get
+					val numerator = v * lines
+					val pmiF = log10(numerator.toFloat / (d1.toFloat * d2.toFloat)).toFloat
+					val pmiValue = new Pair[Float, Int](pmiF, v)
+					m.put(k, pmiValue)
+				}
 			}
 			(key, m)
 		}}
+		// filter out empty maps
+		.filter(!_._2.isEmpty)
 		// get it to the right format
 		.map{case (key, m) => {
 			var str: String = ""
