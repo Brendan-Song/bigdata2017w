@@ -88,14 +88,17 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
       // if t != t_prev && t_prev != 0
       if (!key.getLeftElement().equals(lastWord) && !lastWord.equals("")) {
         // emit (term t, postings P)
-        byteStream.flush();
         dataStream.flush();
+        byteStream.flush();
 
-        WritableUtils.writeVInt(dataStream, df);
-        dataStream.write(byteStream.toByteArray());
+        ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(byteStream.size());
+        DataOutputStream dataBuffer = new DataOutputStream(byteBuffer);
+
+        WritableUtils.writeVInt(dataBuffer, df);
+        dataBuffer.write(byteStream.toByteArray());
 
         TERM.set(lastWord);
-        context.write(TERM, new BytesWritable(byteStream.toByteArray()));
+        context.write(TERM, new BytesWritable(byteBuffer.toByteArray()));
 
         // P.reset
         byteStream.reset();
@@ -120,14 +123,17 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     public void cleanup(Context context)
         throws IOException, InterruptedException {
       // emit (term t, postings P)
-      byteStream.flush();
       dataStream.flush();
+      byteStream.flush();
 
-      WritableUtils.writeVInt(dataStream, df);
+      ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(byteStream.size());
+      DataOutputStream dataBuffer = new DataOutputStream(byteBuffer);
+
+      WritableUtils.writeVInt(dataBuffer, df);
       dataStream.write(byteStream.toByteArray());
 
       TERM.set(lastWord);
-      context.write(TERM, new BytesWritable(byteStream.toByteArray()));
+      context.write(TERM, new BytesWritable(byteBuffer.toByteArray()));
 
       byteStream.close();
       dataStream.close();

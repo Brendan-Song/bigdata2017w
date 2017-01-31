@@ -3,11 +3,14 @@ package ca.uwaterloo.cs.bigdata2017w.assignment3;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.kohsuke.args4j.CmdLineException;
@@ -19,6 +22,8 @@ import tl.lin.data.pair.PairOfInts;
 import tl.lin.data.pair.PairOfWritables;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Set;
@@ -26,14 +31,28 @@ import java.util.Stack;
 import java.util.TreeSet;
 
 public class BooleanRetrievalCompressed extends Configured implements Tool {
-  private MapFile.Reader index;
+  private MapFile.Reader[] index;
   private FSDataInputStream collection;
   private Stack<Set<Integer>> stack;
+  private int reducers;
 
   private BooleanRetrievalCompressed() {}
 
   private void initialize(String indexPath, String collectionPath, FileSystem fs) throws IOException {
-    index = new MapFile.Reader(new Path(indexPath + "/part-r-00000"), fs.getConf());
+    Path path = new Path(indexPath);
+    FileStatus[] fileList = fs.listStatus(path);
+    int parts = fileList.length;
+    reducers = parts - 1;
+    index = new MapFile.Reader[parts];
+
+    int i = 0;
+    for (FileStatus file : fileList) {
+      if (file.isDir() && file.getPath().toString().contains("part-r-")) {
+        index[i] = new MapFile.Reader(file.getPath(), fs.getConf());
+        i++;
+      }
+    }
+
     collection = fs.open(new Path(collectionPath));
     stack = new Stack<>();
   }
@@ -107,13 +126,39 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 
   private ArrayListWritable<PairOfInts> fetchPostings(String term) throws IOException {
     Text key = new Text();
-    PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>> value =
-        new PairOfWritables<>();
+    BytesWritable value = new BytesWritable();
 
     key.set(term);
-    index.get(key, value);
 
-    return value.getRightElement();
+    // get correct partition - this must be the same as the indexer
+    int partition = (term.hashCode() & Integer.MAX_VALUE) % reducers;
+    index[partition + 1].get(key, value);
+
+    return decodePostings(value);
+    //ArrayListWritable<PairOfInts> postings = decodePostings(value);
+
+    //return postings;
+  }
+
+  private ArrayListWritable<PairOfInts> decodePostings(BytesWritable value) throws IOException {
+    ArrayListWritable<PairOfInts> postings = new ArrayListWritable<PairOfInts>();
+    byte[] valBytes = value.getBytes();
+
+    ByteArrayInputStream byteStream = new ByteArrayInputStream(valBytes);
+    DataInputStream dataStream = new DataInputStream(byteStream);
+    
+    int docno = 0;
+    int df = WritableUtils.readVInt(dataStream);
+
+    for (int i = 0; i < df; i++) {
+      int dgap = WritableUtils.readVInt(dataStream);
+      int tf = WritableUtils.readVInt(dataStream);
+
+      docno += dgap;
+      postings.add(new PairOfInts(docno, tf));
+    }
+
+    return postings;
   }
 
   public String fetchLine(long offset) throws IOException {
