@@ -41,13 +41,12 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
   private void initialize(String indexPath, String collectionPath, FileSystem fs) throws IOException {
     Path path = new Path(indexPath);
     FileStatus[] fileList = fs.listStatus(path);
-    int parts = fileList.length;
-    reducers = parts - 1;
-    index = new MapFile.Reader[parts];
+    reducers = fileList.length - 1; // get rid of _SUCCESS 
+    index = new MapFile.Reader[reducers];
 
     int i = 0;
     for (FileStatus file : fileList) {
-      if (file.isDir() && file.getPath().toString().contains("part-r-")) {
+      if (file.getPath().toString().contains("part-")) {
         index[i] = new MapFile.Reader(file.getPath(), fs.getConf());
         i++;
       }
@@ -132,12 +131,9 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 
     // get correct partition - this must be the same as the indexer
     int partition = (term.hashCode() & Integer.MAX_VALUE) % reducers;
-    index[partition + 1].get(key, value);
+    index[partition].get(key, value);
 
     return decodePostings(value);
-    //ArrayListWritable<PairOfInts> postings = decodePostings(value);
-
-    //return postings;
   }
 
   private ArrayListWritable<PairOfInts> decodePostings(BytesWritable value) throws IOException {
