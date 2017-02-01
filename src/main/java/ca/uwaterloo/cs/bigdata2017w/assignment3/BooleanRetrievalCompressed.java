@@ -140,6 +140,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     ArrayListWritable<PairOfInts> postings = new ArrayListWritable<PairOfInts>();
     byte[] valBytes = value.getBytes();
 
+    // decode index
     ByteArrayInputStream byteStream = new ByteArrayInputStream(valBytes);
     DataInputStream dataStream = new DataInputStream(byteStream);
     
@@ -150,6 +151,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
       int dgap = WritableUtils.readVInt(dataStream);
       int tf = WritableUtils.readVInt(dataStream);
 
+      // build docno from gaps
       docno += dgap;
       postings.add(new PairOfInts(docno, tf));
     }
