@@ -1,20 +1,4 @@
-/**
- * Bespin: reference implementations of "big data" algorithms
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package io.bespin.java.mapreduce.pagerank;
+package ca.uwaterloo.cs.bigdata2017w.assignment4;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -47,8 +31,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 
-public class FindMaxPageRankNodes extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(FindMaxPageRankNodes.class);
+public class FindMaxPersonalizedPageRankNodes extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(FindMaxPersonalizedPageRankNodes.class);
 
   private static class MyMapper extends
       Mapper<IntWritable, PageRankNode, IntWritable, FloatWritable> {
@@ -115,7 +99,7 @@ public class FindMaxPageRankNodes extends Configured implements Tool {
     }
   }
 
-  public FindMaxPageRankNodes() {
+  public FindMaxPersonalizedPageRankNodes() {
   }
 
   private static final String INPUT = "input";
@@ -159,7 +143,7 @@ public class FindMaxPageRankNodes extends Configured implements Tool {
     String outputPath = cmdline.getOptionValue(OUTPUT);
     int n = Integer.parseInt(cmdline.getOptionValue(TOP));
 
-    LOG.info("Tool name: " + FindMaxPageRankNodes.class.getSimpleName());
+    LOG.info("Tool name: " + FindMaxPersonalizedPageRankNodes.class.getSimpleName());
     LOG.info(" - input: " + inputPath);
     LOG.info(" - output: " + outputPath);
     LOG.info(" - top: " + n);
@@ -169,8 +153,8 @@ public class FindMaxPageRankNodes extends Configured implements Tool {
     conf.setInt("n", n);
 
     Job job = Job.getInstance(conf);
-    job.setJobName(FindMaxPageRankNodes.class.getName() + ":" + inputPath);
-    job.setJarByClass(FindMaxPageRankNodes.class);
+    job.setJobName(FindMaxPersonalizedPageRankNodes.class.getName() + ":" + inputPath);
+    job.setJarByClass(FindMaxPersonalizedPageRankNodes.class);
 
     job.setNumReduceTasks(1);
 
@@ -202,7 +186,7 @@ public class FindMaxPageRankNodes extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    int res = ToolRunner.run(new FindMaxPageRankNodes(), args);
+    int res = ToolRunner.run(new FindMaxPersonalizedPageRankNodes(), args);
     System.exit(res);
   }
 }

@@ -1,20 +1,4 @@
-/**
- * Bespin: reference implementations of "big data" algorithms
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package io.bespin.java.mapreduce.pagerank;
+package ca.uwaterloo.cs.bigdata2017w.assignment4;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -53,8 +37,8 @@ import java.util.Arrays;
  * @author Jimmy Lin
  * @author Michael Schatz
  */
-public class BuildPageRankRecords extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(BuildPageRankRecords.class);
+public class BuildPersonalizedPageRankRecords extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(BuildPersonalizedPageRankRecords.class);
 
   private static final String NODE_CNT_FIELD = "node.cnt";
 
@@ -104,7 +88,7 @@ public class BuildPageRankRecords extends Configured implements Tool {
     }
   }
 
-  public BuildPageRankRecords() {}
+  public BuildPersonalizedPageRankRecords() {}
 
   private static final String INPUT = "input";
   private static final String OUTPUT = "output";
@@ -147,7 +131,7 @@ public class BuildPageRankRecords extends Configured implements Tool {
     String outputPath = cmdline.getOptionValue(OUTPUT);
     int n = Integer.parseInt(cmdline.getOptionValue(NUM_NODES));
 
-    LOG.info("Tool name: " + BuildPageRankRecords.class.getSimpleName());
+    LOG.info("Tool name: " + BuildPersonalizedPageRankRecords.class.getSimpleName());
     LOG.info(" - inputDir: " + inputPath);
     LOG.info(" - outputDir: " + outputPath);
     LOG.info(" - numNodes: " + n);
@@ -157,8 +141,8 @@ public class BuildPageRankRecords extends Configured implements Tool {
     conf.setInt("mapred.min.split.size", 1024 * 1024 * 1024);
 
     Job job = Job.getInstance(conf);
-    job.setJobName(BuildPageRankRecords.class.getSimpleName() + ":" + inputPath);
-    job.setJarByClass(BuildPageRankRecords.class);
+    job.setJobName(BuildPersonalizedPageRankRecords.class.getSimpleName() + ":" + inputPath);
+    job.setJarByClass(BuildPersonalizedPageRankRecords.class);
 
     job.setNumReduceTasks(0);
 
@@ -188,6 +172,6 @@ public class BuildPageRankRecords extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    ToolRunner.run(new BuildPageRankRecords(), args);
+    ToolRunner.run(new BuildPersonalizedPageRankRecords(), args);
   }
 }
