@@ -34,7 +34,9 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 /**
  * <p>
@@ -313,26 +315,39 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
       Mapper<IntWritable, PageRankNode, IntWritable, PageRankNode> {
     private float missingMass = 0.0f;
     private int nodeCnt = 0;
+    private static Set<Integer> sources = new HashSet<Integer>();
 
     @Override
     public void setup(Context context) throws IOException {
       Configuration conf = context.getConfiguration();
+      String[] sourceNodes = conf.getStrings("sourceNodes");
 
       missingMass = conf.getFloat("MissingMass", 0.0f);
       nodeCnt = conf.getInt("NodeCount", 0);
+
+      // get source nodes
+      for(String sourceNode : sourceNodes) {
+        sources.add(Integer.valueOf(sourceNode));
+      }
     }
 
     @Override
     public void map(IntWritable nid, PageRankNode node, Context context)
         throws IOException, InterruptedException {
       float p = node.getPageRank();
+      float jump = Float.NEGATIVE_INFINITY;
+      float link = Float.NEGATIVE_INFINITY;
 
-      float jump = (float) (Math.log(ALPHA) - Math.log(nodeCnt));
-      float link = (float) Math.log(1.0f - ALPHA)
-          + sumLogProbs(p, (float) (Math.log(missingMass) - Math.log(nodeCnt)));
+      // give all page rank mass to the source node
+      if(sources.contains(node.getNodeId())) {
+        jump = (float) (Math.log(ALPHA));
+        link = (float) Math.log(1.0f - ALPHA)
+          + sumLogProbs(p, (float) Math.log(missingMass));
+      } else {
+        link = (float) Math.log(1.0f - ALPHA) + p;
+      }
 
-      p = sumLogProbs(jump, link);
-      node.setPageRank(p);
+      node.setPageRank(sumLogProbs(jump, link));
 
       context.write(nid, node);
     }
@@ -358,6 +373,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
   private static final String COMBINER = "useCombiner";
   private static final String INMAPPER_COMBINER = "useInMapperCombiner";
   private static final String RANGE = "range";
+  private static final String SOURCE_NODES = "sources";
 
   /**
    * Runs this tool.
@@ -378,6 +394,8 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
         .withDescription("end iteration").create(END));
     options.addOption(OptionBuilder.withArgName("num").hasArg()
         .withDescription("number of nodes").create(NUM_NODES));
+    options.addOption(OptionBuilder.withArgName("sources").hasArg()
+        .withDescription("source nodes").create(SOURCE_NODES));
 
     CommandLine cmdline;
     CommandLineParser parser = new GnuParser();
@@ -390,7 +408,8 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     }
 
     if (!cmdline.hasOption(BASE) || !cmdline.hasOption(START) ||
-        !cmdline.hasOption(END) || !cmdline.hasOption(NUM_NODES)) {
+        !cmdline.hasOption(END) || !cmdline.hasOption(NUM_NODES) ||
+        !cmdline.hasOption(SOURCE_NODES)) {
       System.out.println("args: " + Arrays.toString(args));
       HelpFormatter formatter = new HelpFormatter();
       formatter.setWidth(120);
@@ -406,6 +425,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     boolean useCombiner = cmdline.hasOption(COMBINER);
     boolean useInmapCombiner = cmdline.hasOption(INMAPPER_COMBINER);
     boolean useRange = cmdline.hasOption(RANGE);
+    String sourceNodes = cmdline.getOptionValue(SOURCE_NODES);
 
     LOG.info("Tool name: RunPageRank");
     LOG.info(" - base path: " + basePath);
@@ -415,10 +435,11 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     LOG.info(" - use combiner: " + useCombiner);
     LOG.info(" - use in-mapper combiner: " + useInmapCombiner);
     LOG.info(" - user range partitioner: " + useRange);
+    LOG.info(" - source nodes: " + sourceNodes);
 
     // Iterate PageRank.
     for (int i = s; i < e; i++) {
-      iteratePageRank(i, i + 1, basePath, n, useCombiner, useInmapCombiner);
+      iteratePageRank(i, i + 1, basePath, n, useCombiner, useInmapCombiner, sourceNodes);
     }
 
     return 0;
@@ -426,21 +447,21 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 
   // Run each iteration.
   private void iteratePageRank(int i, int j, String basePath, int numNodes,
-      boolean useCombiner, boolean useInMapperCombiner) throws Exception {
+      boolean useCombiner, boolean useInMapperCombiner, String sourceNodes) throws Exception {
     // Each iteration consists of two phases (two MapReduce jobs).
 
     // Job 1: distribute PageRank mass along outgoing edges.
-    float mass = phase1(i, j, basePath, numNodes, useCombiner, useInMapperCombiner);
+    float mass = phase1(i, j, basePath, numNodes, useCombiner, useInMapperCombiner, sourceNodes);
 
     // Find out how much PageRank mass got lost at the dangling nodes.
     float missing = 1.0f - (float) StrictMath.exp(mass);
 
     // Job 2: distribute missing mass, take care of random jump factor.
-    phase2(i, j, missing, basePath, numNodes);
+    phase2(i, j, missing, basePath, numNodes, sourceNodes);
   }
 
   private float phase1(int i, int j, String basePath, int numNodes,
-      boolean useCombiner, boolean useInMapperCombiner) throws Exception {
+      boolean useCombiner, boolean useInMapperCombiner, String sourceNodes) throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName("PageRank:Basic:iteration" + j + ":Phase1");
     job.setJarByClass(RunPersonalizedPageRankBasic.class);
@@ -472,6 +493,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     job.getConfiguration().setBoolean("mapred.reduce.tasks.speculative.execution", false);
     //job.getConfiguration().set("mapred.child.java.opts", "-Xmx2048m");
     job.getConfiguration().set("PageRankMassPath", outm);
+    job.getConfiguration().setStrings("sourceNodes", sourceNodes);
 
     job.setNumReduceTasks(numReduceTasks);
 
@@ -513,7 +535,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     return mass;
   }
 
-  private void phase2(int i, int j, float missing, String basePath, int numNodes) throws Exception {
+  private void phase2(int i, int j, float missing, String basePath, int numNodes, String sourceNodes) throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName("PageRank:Basic:iteration" + j + ":Phase2");
     job.setJarByClass(RunPersonalizedPageRankBasic.class);
@@ -532,6 +554,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     job.getConfiguration().setBoolean("mapred.reduce.tasks.speculative.execution", false);
     job.getConfiguration().setFloat("MissingMass", (float) missing);
     job.getConfiguration().setInt("NodeCount", numNodes);
+    job.getConfiguration().setStrings("sourceNodes", sourceNodes);
 
     job.setNumReduceTasks(0);
 
