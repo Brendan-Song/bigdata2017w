@@ -24,10 +24,12 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 import tl.lin.data.array.ArrayListOfIntsWritable;
+import tl.lin.data.array.ArrayListOfFloatsWritable;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -47,7 +49,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
   private static class MyMapper extends Mapper<LongWritable, Text, IntWritable, PageRankNode> {
     private static final IntWritable nid = new IntWritable();
     private static final PageRankNode node = new PageRankNode();
-    private static Set<Integer> sources = new HashSet<Integer>();
+    private static Set<Integer> sources = new LinkedHashSet<Integer>();
 
     @Override
     public void setup(Mapper<LongWritable, Text, IntWritable, PageRankNode>.Context context) {
@@ -63,13 +65,6 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
       // get source nodes
       for(String sourceNode : sourceNodes) {
         sources.add(Integer.valueOf(sourceNode));
-      }
-
-      // set source node mass to 1
-      if (sources.contains(node.getNodeId())) {
-        node.setPageRank((float) StrictMath.log(1));
-      } else {
-        node.setPageRank((float) StrictMath.log(0));
       }
     }
 
@@ -92,6 +87,25 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
         }
 
         node.setAdjacencyList(new ArrayListOfIntsWritable(neighbors));
+      }
+
+      ArrayListOfFloatsWritable pageranks = new ArrayListOfFloatsWritable();
+
+      // multi source set source node masses to 1
+      for(int source : sources) {
+        if(source == node.getNodeId()) {
+          pageranks.add((float) StrictMath.log(1));
+        } else {
+          pageranks.add((float) StrictMath.log(0));
+        }
+      }
+      node.setPageRanks(pageranks);
+      
+      // single source set source node mass to 1
+      if (sources.contains(node.getNodeId())) {
+        node.setPageRank((float) StrictMath.log(1));
+      } else {
+        node.setPageRank((float) StrictMath.log(0));
       }
 
       context.getCounter("graph", "numNodes").increment(1);

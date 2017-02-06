@@ -2,6 +2,7 @@ package ca.uwaterloo.cs.bigdata2017w.assignment4;
 
 import org.apache.hadoop.io.Writable;
 import tl.lin.data.array.ArrayListOfIntsWritable;
+import tl.lin.data.array.ArrayListOfFloatsWritable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -36,6 +37,7 @@ public class PageRankNode implements Writable {
   private int nodeid;
   private float pagerank;
   private ArrayListOfIntsWritable adjacenyList;
+  private ArrayListOfFloatsWritable pageranks;
 
   public PageRankNode() {}
 
@@ -43,8 +45,16 @@ public class PageRankNode implements Writable {
     return pagerank;
   }
 
+  public ArrayListOfFloatsWritable getPageRanks() {
+    return pageranks;
+  }
+
   public void setPageRank(float p) {
     this.pagerank = p;
+  }
+
+  public void setPageRanks(ArrayListOfFloatsWritable p) {
+    this.pageranks = p;
   }
 
   public int getNodeId() {
@@ -84,11 +94,15 @@ public class PageRankNode implements Writable {
 
     if (type.equals(Type.Mass)) {
       pagerank = in.readFloat();
+      pageranks = new ArrayListOfFloatsWritable();
+      pageranks.readFields(in);
       return;
     }
 
     if (type.equals(Type.Complete)) {
       pagerank = in.readFloat();
+      pageranks = new ArrayListOfFloatsWritable();
+      pageranks.readFields(in);
     }
 
     adjacenyList = new ArrayListOfIntsWritable();
@@ -107,11 +121,13 @@ public class PageRankNode implements Writable {
 
     if (type.equals(Type.Mass)) {
       out.writeFloat(pagerank);
+      pageranks.write(out);
       return;
     }
 
     if (type.equals(Type.Complete)) {
       out.writeFloat(pagerank);
+      pageranks.write(out);
     }
 
     adjacenyList.write(out);
@@ -119,8 +135,9 @@ public class PageRankNode implements Writable {
 
   @Override
   public String toString() {
-    return String.format("{%d %.4f %s}", nodeid, pagerank, (adjacenyList == null ? "[]"
-        : adjacenyList.toString(10)));
+    return String.format("{%d %.4f %s %s}", nodeid, pagerank, 
+        (pageranks == null ? "[]" : pageranks.toString(10)),
+        (adjacenyList == null ? "[]" : adjacenyList.toString(10)));
   }
 
   /**
