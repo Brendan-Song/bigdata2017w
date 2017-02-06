@@ -23,3 +23,25 @@ Source: 73273
 0.00147 3434750
 
 0.00139 178880
+
+Aside: Document numbers and titles
+
+73273 = "Waterloo, Ontario"
+
+5042916 = "Canada"
+
+22218 = "Ontario"
+
+259124 = "Regional Municipality of Waterloo"
+
+89585 = "Kitchener, Ontario"
+
+5752184 = "Canada 2011 Census"
+
+498093 = "Wellesley, Ontario"
+
+20798 = "Mennonite"
+
+3434750 = "United States"
+
+178880 = "Cambridge, Ontario"
