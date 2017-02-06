@@ -29,14 +29,6 @@ import java.util.Arrays;
 import tl.lin.data.queue.TopScoredObjects;
 import tl.lin.data.pair.PairOfObjectFloat;
 
-/**
- * <p>
- * Driver program for partitioning the graph.
- * </p>
- *
- * @author Jimmy Lin
- * @author Michael Schatz
- */
 public class ExtractTopPersonalizedPageRankNodes extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(ExtractTopPersonalizedPageRankNodes.class);
 
