@@ -25,7 +25,9 @@ import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.ArrayList;
 
+import tl.lin.data.array.ArrayListOfFloatsWritable;
 import tl.lin.data.queue.TopScoredObjects;
 import tl.lin.data.pair.PairOfObjectFloat;
 
@@ -97,11 +99,17 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
   private void printTopX(String inPath, String sourceNodes, int top)
     throws IOException, InstantiationException, IllegalAccessException {
 
-    TopScoredObjects<Integer> results = new TopScoredObjects<Integer>(top);
+    ArrayList<TopScoredObjects<Integer>> results = new ArrayList<TopScoredObjects<Integer>>();
+    String[] sources = sourceNodes.split(",");
+    int k = 0;
+    for (String source : sources) {
+      results.add(k, new TopScoredObjects<Integer>(top));
+      k++;
+    }
+
     Configuration conf = new Configuration();
     Path path = new Path(inPath);
     FileSystem fs = FileSystem.get(conf);
-    String[] sources = sourceNodes.split(",");
 
     for(FileStatus file : fs.listStatus(path)) {
       Path fPath = file.getPath();
@@ -113,7 +121,12 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
         PageRankNode value = (PageRankNode) reader.getValueClass().newInstance();
 
         while(reader.next(key, value)) {
-          results.add(key.get(), value.getPageRank());
+          ArrayListOfFloatsWritable masses = value.getPageRanks();
+          int j = 0;
+          for (float mass : masses) {
+            results.get(j).add(key.get(), mass);
+            j++;
+          }
         }
         reader.close();
       }
@@ -121,8 +134,9 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
 
     for(int i = 0; i < sources.length; i++) {
       System.out.println("Source: " + sources[i]);
+      TopScoredObjects<Integer> masses = results.get(i);
       
-      for(PairOfObjectFloat<Integer> pair : results.extractAll()) {
+      for(PairOfObjectFloat<Integer> pair : masses.extractAll()) {
         int node = ((Integer) pair.getLeftElement());
         float p = (float) Math.exp(pair.getRightElement());
         System.out.println(String.format("%.5f %d", p, node));
