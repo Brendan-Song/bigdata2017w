@@ -100,13 +100,13 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
         }
       }
       node.setPageRanks(pageranks);
-      
+      /*
       // single source set source node mass to 1
       if (sources.contains(node.getNodeId())) {
         node.setPageRank((float) StrictMath.log(1));
       } else {
         node.setPageRank((float) StrictMath.log(0));
-      }
+      }*/
 
       context.getCounter("graph", "numNodes").increment(1);
       context.getCounter("graph", "numEdges").increment(arr.length - 1);

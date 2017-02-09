@@ -101,10 +101,8 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
 
     ArrayList<TopScoredObjects<Integer>> results = new ArrayList<TopScoredObjects<Integer>>();
     String[] sources = sourceNodes.split(",");
-    int k = 0;
     for (String source : sources) {
-      results.add(k, new TopScoredObjects<Integer>(top));
-      k++;
+      results.add(new TopScoredObjects<Integer>(top));
     }
 
     Configuration conf = new Configuration();
@@ -123,8 +121,8 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
         while(reader.next(key, value)) {
           ArrayListOfFloatsWritable masses = value.getPageRanks();
           int j = 0;
-          for (float mass : masses) {
-            results.get(j).add(key.get(), mass);
+          for (TopScoredObjects<Integer> r : results) {
+            r.add(key.get(), masses.get(j));
             j++;
           }
         }
