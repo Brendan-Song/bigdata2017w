@@ -41,7 +41,7 @@ object Q1 {
     if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
 
-      val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
+      val lineitemDF = sparkSession.read.parquet("/shared/cs489/data/TPC-H-0.1-PARQUET/lineitem")
       textFile = lineitemDF.rdd.map(x=>x.toString())
     }
     val shipdate = args.date()
