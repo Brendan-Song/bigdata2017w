@@ -60,9 +60,8 @@ object Q1 {
       val shipdate = args.date()
 
       val counts = lineitemRDD
-      .map(line => line.toString())
-      .flatMap(line => {
-        val lines = line.split("\\|")
+      .flatMap(lines => {
+        //val lines = line.split("\\|")
         // L_SHIPDATE is at index 10 according to TPC-H benchmark
         if (lines(10).contains(shipdate)) {
           List(lines(10))
