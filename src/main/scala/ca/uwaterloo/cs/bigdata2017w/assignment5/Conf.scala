@@ -23,5 +23,7 @@ class Conf(args: Seq[String]) extends ScallopConf(args) {
   mainOptions = Seq(input, date)
   val input = opt[String](descr = "input path", required = true)
   val date = opt[String](descr = "L_SHIPDATE", required = true)
+  val parquet = opt[Boolean]("parquet", descr = "is data parquet")
+  val text = opt[Boolean]("text", descr = "is data text")
   verify()
 }

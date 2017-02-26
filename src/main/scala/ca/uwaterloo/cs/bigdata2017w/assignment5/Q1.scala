@@ -21,6 +21,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.rogach.scallop._
 import tl.lin.data.pair.PairOfStrings
+import org.apache.spark.sql.SparkSession
 
 object Q1 {
   val log = Logger.getLogger(getClass().getName())
@@ -30,12 +31,19 @@ object Q1 {
 
     log.info("Input: " + args.input())
     log.info("Date: " + args.date())
+    log.info("Parquet: " + args.parquet())
 
     val conf = new SparkConf().setAppName("Q1")
     val sc = new SparkContext(conf)
 
     // looking at lineitem.tbl file
-    val textFile = sc.textFile(args.input() + "/lineitem.tbl")
+    var textFile = sc.textFile(args.input() + "/lineitem.tbl")
+    if (args.parquet()) {
+      val sparkSession = SparkSession.builder.getOrCreate
+
+      val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
+      textFile = lineitemDF.rdd.map(x=>x.toString())
+    }
     val shipdate = args.date()
 
     val counts = textFile
