@@ -36,26 +36,41 @@ object Q1 {
     val conf = new SparkConf().setAppName("Q1")
     val sc = new SparkContext(conf)
 
-    // looking at lineitem.tbl file
-    var textFile = sc.textFile(args.input() + "/lineitem.tbl")
-    if (args.parquet()) {
+    if (args.text()) {
+      // looking at lineitem.tbl file
+      val textFile = sc.textFile(args.input() + "/lineitem.tbl")
+      val shipdate = args.date()
+  
+      val counts = textFile
+      .flatMap(line => {
+        val lines = line.split("\\|")
+        // L_SHIPDATE is at index 10 according to TPC-H benchmark
+        if (lines(10).contains(shipdate)) {
+          List(lines(10))
+        } else {
+          List()
+        }
+      })
+      println("ANSWER=" + counts.count())
+    } else {
       val sparkSession = SparkSession.builder.getOrCreate
 
-      val lineitemDF = sparkSession.read.parquet("/shared/cs489/data/TPC-H-0.1-PARQUET/lineitem")
-      textFile = lineitemDF.rdd.map(x=>x.toString())
-    }
-    val shipdate = args.date()
+      val lineitemDF = sparkSession.read.parquet(args.input() + "/lineitem")
+      val lineitemRDD = lineitemDF.rdd
+      val shipdate = args.date()
 
-    val counts = textFile
-    .flatMap(line => {
-      val lines = line.split("\\|")
-      // L_SHIPDATE is at index 10 according to TPC-H benchmark
-      if (lines(10).contains(shipdate)) {
-        List(lines(10))
-      } else {
-        List()
-      }
-    })
-    println("ANSWER=" + counts.count())
+      val counts = lineitemRDD
+      .map(line => line.toString())
+      .flatMap(line => {
+        val lines = line.split("\\|")
+        // L_SHIPDATE is at index 10 according to TPC-H benchmark
+        if (lines(10).contains(shipdate)) {
+          List(lines(10))
+        } else {
+           List()  
+        }
+      })
+      println("ANSWER=" + counts.count())
+    }
   }
 }
