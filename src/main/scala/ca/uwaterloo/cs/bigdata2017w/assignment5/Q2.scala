@@ -19,6 +19,7 @@ import org.apache.log4j._
 import org.apache.spark.Partitioner
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
 import org.rogach.scallop._
 import tl.lin.data.pair.PairOfStrings
 
@@ -34,50 +35,99 @@ object Q2 {
     val conf = new SparkConf().setAppName("Q2")
     val sc = new SparkContext(conf)
 
-    // lineitem.tbl
-    val lineitem = sc.textFile(args.input() + "/lineitem.tbl")
-    val orders = sc.textFile(args.input() + "/orders.tbl")
-    val shipdate = args.date()
+    if (args.text()) {
+      // lineitem.tbl
+      val lineitem = sc.textFile(args.input() + "/lineitem.tbl")
+      val orders = sc.textFile(args.input() + "/orders.tbl")
+      val shipdate = args.date()
 
-    val lineitems = lineitem
-    .flatMap(line => {
-      val lines = line.split("\\|")
-      // l_shipdate is at index 10 according to TPC-H benchmark
-      if (lines(10).contains(shipdate)) {
-        // emit l_orderkey and l_shipdate
-        List(new Pair(lines(0), lines(10)))
-      } else {
-        List()
+      val lineitems = lineitem
+      .flatMap(line => {
+        val lines = line.split("\\|")
+        // l_shipdate is at index 10 according to TPC-H benchmark
+        if (lines(10).contains(shipdate)) {
+          // emit l_orderkey and l_shipdate
+          List(new Pair(lines(0), lines(10)))
+        } else {
+          List()
+        }
+      })
+
+      val clerks = orders
+      .flatMap(line => {
+        val lines = line.split("\\|")
+        // emit o_orderkey and o_clerk
+        List(new Pair(lines(0), lines(6)))
+      })
+
+      val grouped = clerks
+      .cogroup(lineitems)
+      .flatMap(data => {
+        // data is formatted as: {orderkey, {{clerks}, {lineitems}}}
+        val o_key = data._1
+        val lineitemlist = data._2._2
+        // make sure date is there
+        if(!lineitemlist.isEmpty) {
+          val clerklist = data._2._1
+          val clerk = clerklist.map(x => x)
+          List(new Pair(Integer.parseInt(o_key), clerk.mkString(" ")))
+        } else {
+          List()
+        }
+      })
+      .sortByKey(true)
+
+      val answer = grouped.take(20)
+      for(pair <- answer) {
+        println("(" + pair._2 + "," + pair._1 + ")")
       }
-    })
+    } else {
+      val sparkSession = SparkSession.builder.getOrCreate
 
-    val clerks = orders
-    .flatMap(line => {
-      val lines = line.split("\\|")
-      // emit o_orderkey and o_clerk
-      List(new Pair(lines(0), lines(6)))
-    })
+      val lineitemDF = sparkSession.read.parquet(args.input() + "/lineitem")
+      val lineitemRDD = lineitemDF.rdd
+      val ordersDF = sparkSession.read.parquet(args.input() + "/orders")
+      val ordersRDD = ordersDF.rdd
+      val shipdate = args.date()
 
-    val grouped = clerks
-    .cogroup(lineitems)
-    .flatMap(data => {
-      // data is formatted as: {orderkey, {{clerks}, {lineitems}}}
-      val o_key = data._1
-      val lineitemlist = data._2._2
-      // make sure date is there
-      if(!lineitemlist.isEmpty) {
-        val clerklist = data._2._1
-        val clerk = clerklist.map(x => x)
-        List(new Pair(Integer.parseInt(o_key), clerk.mkString(" ")))
-      } else {
-        List()
+      val lineitems = lineitemRDD
+      .flatMap(lines => {
+        // l_shipdate is at index 10 according to TPC-H benchmark
+        if (lines(10).toString.contains(shipdate)) {
+          // emit l_orderkey and l_shipdate
+          List(new Pair(lines(0), lines(10)))
+        } else {
+          List()
+        }
+      })
+
+      val clerks = ordersRDD
+      .flatMap(lines => {
+        // emit o_orderkey and o_clerk
+        List(new Pair(lines(0), lines(6)))
+      })
+  
+      val grouped = clerks
+      .cogroup(lineitems)
+      .flatMap(data => {
+        // data is formatted as: {orderkey, {{clerks}, {lineitems}}}
+        val o_key = data._1
+        val lineitemlist = data._2._2
+        // make sure date is there
+        if(!lineitemlist.isEmpty) {
+          val clerklist = data._2._1
+          val clerk = clerklist.map(x => x)
+          List(new Pair(o_key.toString.toInt, clerk.mkString(" ")))
+        } else {
+          List()
+        }
+      })
+      .sortByKey(true)
+
+      val answer = grouped.take(20)
+      for(pair <- answer) {
+        println("(" + pair._2 + "," + pair._1 + ")")
       }
-    })
-    .sortByKey(true)
-
-    val answer = grouped.take(20)
-    for(pair <- answer) {
-      println("(" + pair._2 + "," + pair._1 + ")")
     }
   }
 }
