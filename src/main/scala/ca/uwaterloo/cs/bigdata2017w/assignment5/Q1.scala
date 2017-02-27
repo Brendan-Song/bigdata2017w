@@ -63,10 +63,10 @@ object Q1 {
       .flatMap(lines => {
         //val lines = line.split("\\|")
         // L_SHIPDATE is at index 10 according to TPC-H benchmark
-        if (lines(10).contains(shipdate)) {
+        if (lines(10).toString.contains(shipdate)) {
           List(lines(10))
         } else {
-           List()  
+          List()  
         }
       })
       println("ANSWER=" + counts.count())
