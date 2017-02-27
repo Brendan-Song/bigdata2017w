@@ -162,13 +162,14 @@ object Q4 {
       val grouped = o
       .cogroup(lineitems)
       .flatMap(data => {
-        val o_data = data._2._1
-        val l_data = data._2._2
+        // data is of the form: {o_orderkey, {{n_nationkey, n_name}, {l_shipdate}}}
+        val o_data = data._2._1 // get {n_nationkey, n_name}
+        val l_data = data._2._2 // get {l_shipdate}
         val l_iterable = l_data.map(x => x)
         if(!l_iterable.isEmpty) {
           o_data
           .flatMap(y => {
-            List(new Pair(y._1.get.toString.toInt, y._2.get))
+            List(new Pair(y._1.get.toString.toInt, y._2.get.toString))
           })
         } else {
           List()
