@@ -34,16 +34,10 @@ object TrainSpamClassifier {
 
     val conf = new SparkConf().setAppName("TrainSpamClassifier")
     val sc = new SparkContext(conf)
-    val textFile = sc.textFile(args.input())
+    val textFile = sc.textFile("/u0/cs489/public_html/spam/" + args.input())
+    val outputPath = new Path(args.model())
+    FileSystem.get(sc.hadoopConfiguration).delete(outputPath, true)
 
-    val trained = textFile.map(line => {
-      // parse input
-      (0, (docid, isSpam, features))
-    }).groupByKey(1)
-    // run the trainer
-    trained.saveAsTextFile()
-
-    //----------------Begin boilerplate-------------
     // w is the weight vector (make sure the variable is within scope)
     val w = Map[Int, Double]()
 
@@ -54,23 +48,36 @@ object TrainSpamClassifier {
       score
     }
 
-    // This is the main learner:
-    val delta = 0.002
-
-    // For each instance...
-    val isSpam = ...   // label
-    val features = ... // feature vector of the training instance
-
-    // Update the weights as follows:
-    val score = spamminess(features)
-    val prob = 1.0 / (1 + exp(-score))
-    features.foreach(f => {
-      if (w.contains(f)) {
-        w(f) += (isSpam - prob) * delta
-      } else {
-        w(f) = (isSpam - prob) * delta
-      }
+    val trained = textFile.map(line => {
+      // parse input
+      val lines = line.split(" ")
+      (0, (lines(0), lines(1) == "spam", lines.drop(2).map(data => data.toInt)))
     })
-    //------------------End boilerplate----------------
+    .groupByKey(1)
+    .map(data => {
+      // do learning here
+      // This is the main learner:
+      val delta = 0.002
+
+      // For each instance...
+      data._2.foreach(instance => {
+        val isSpam = if(instance._2) 1 else 0   // label
+        val features = instance._3 // feature vector of the training instance
+
+        // Update the weights as follows:
+        val score = spamminess(features)
+        val prob = 1.0 / (1 + exp(-score))
+        features.foreach(f => {
+          if (w.contains(f)) {
+            w(f) += (isSpam - prob) * delta
+          } else {
+            w(f) = (isSpam - prob) * delta
+          }
+        })
+      })
+      w
+    })
+    .flatMap(data => data)
+    trained.saveAsTextFile(args.model())
   }
 }

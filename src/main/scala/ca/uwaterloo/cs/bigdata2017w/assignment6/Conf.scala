@@ -20,7 +20,7 @@ import org.apache.log4j._
 import org.rogach.scallop._
 
 class Conf(args: Seq[String]) extends ScallopConf(args) {
-  mainOptions = Seq(input, date)
+  mainOptions = Seq(input, model)
   val input = opt[String](descr = "input path", required = true)
   val model = opt[String](descr = "output directory", required = false)
   verify()
