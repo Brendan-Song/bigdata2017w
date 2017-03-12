@@ -22,6 +22,7 @@ import org.rogach.scallop._
 class Conf(args: Seq[String]) extends ScallopConf(args) {
   mainOptions = Seq(input, model)
   val input = opt[String](descr = "input path", required = true)
-  val model = opt[String](descr = "output directory", required = false)
+  val model = opt[String](descr = "model directory", required = false)
+  val output = opt[String](descr = "output path", required = false)
   verify()
 }
