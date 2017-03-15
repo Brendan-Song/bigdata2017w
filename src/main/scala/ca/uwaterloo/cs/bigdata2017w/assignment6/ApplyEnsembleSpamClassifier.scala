@@ -23,7 +23,7 @@ import org.rogach.scallop._
 import tl.lin.data.pair.PairOfStrings
 import org.apache.spark.sql.SparkSession
 
-object ApplyEnsenbleSpamClassifier {
+object ApplyEnsembleSpamClassifier {
   val log = Logger.getLogger(getClass().getName())
 
   def main(argv: Array[String]) {
