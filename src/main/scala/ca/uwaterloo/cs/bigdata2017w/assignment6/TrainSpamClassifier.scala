@@ -36,6 +36,7 @@ object TrainSpamClassifier {
     val sc = new SparkContext(conf)
     val textFile = sc.textFile(args.input())
     val outputPath = new Path(args.model())
+    val shuffle = args.shuffle()
     FileSystem.get(sc.hadoopConfiguration).delete(outputPath, true)
 
     // w is the weight vector (make sure the variable is within scope)
@@ -48,36 +49,71 @@ object TrainSpamClassifier {
       score
     }
 
-    val trained = textFile.map(line => {
-      // parse input
-      val lines = line.split(" ")
-      (0, (lines(0), lines(1) == "spam", lines.drop(2).map(data => data.toInt)))
-    })
-    .groupByKey(1)
-    .map(data => {
-      // do learning here
-      // This is the main learner:
-      val delta = 0.002
-
-      // For each instance...
-      data._2.foreach(instance => {
-        val isSpam = if(instance._2) 1 else 0   // label
-        val features = instance._3 // feature vector of the training instance
-
-        // Update the weights as follows:
-        val score = spamminess(features)
-        val prob = 1.0 / (1 + exp(-score))
-        features.foreach(f => {
-          if (w.contains(f)) {
-            w(f) += (isSpam - prob) * delta
-          } else {
-            w(f) = (isSpam - prob) * delta
-          }
-        })
+    if(!shuffle) {
+      val trained = textFile.map(line => {
+        // parse input
+        val lines = line.split(" ")
+        (0, (lines(0), lines(1) == "spam", lines.drop(2).map(data => data.toInt)))
       })
-      w
-    })
-    .flatMap(data => data)
-    trained.saveAsTextFile(args.model())
+      .groupByKey(1)
+      .map(data => {
+        // do learning here
+        // This is the main learner:
+        val delta = 0.002
+
+        // For each instance...
+        data._2.foreach(instance => {
+          val isSpam = if(instance._2) 1 else 0   // label
+          val features = instance._3 // feature vector of the training instance
+
+          // Update the weights as follows:
+          val score = spamminess(features)
+          val prob = 1.0 / (1 + exp(-score))
+          features.foreach(f => {
+            if (w.contains(f)) {
+              w(f) += (isSpam - prob) * delta
+            } else {
+              w(f) = (isSpam - prob) * delta
+            }
+          })
+        })
+        w
+      })
+      .flatMap(data => data)
+      trained.saveAsTextFile(args.model())
+    } else {
+      val trained = textFile.map(line => {
+        // parse input
+        val lines = line.split(" ")
+        (0, (lines(0), lines(1) == "spam", lines.drop(2).map(data => data.toInt), scala.util.Random.nextInt()))
+      })
+      .sortBy(data => data._2._4)
+      .groupByKey(1)
+      .map(data => {
+        // do learning here
+        // This is the main learner:
+        val delta = 0.002
+
+        // For each instance...
+        data._2.foreach(instance => {
+          val isSpam = if(instance._2) 1 else 0   // label
+          val features = instance._3 // feature vector of the training instance
+
+          // Update the weights as follows:
+          val score = spamminess(features)
+          val prob = 1.0 / (1 + exp(-score))
+          features.foreach(f => {
+            if (w.contains(f)) {
+              w(f) += (isSpam - prob) * delta
+            } else {
+              w(f) = (isSpam - prob) * delta
+            }
+          })
+        })
+        w
+      })
+      .flatMap(data => data)
+      trained.saveAsTextFile(args.model())
+    }
   }
 }

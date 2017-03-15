@@ -24,5 +24,6 @@ class Conf(args: Seq[String]) extends ScallopConf(args) {
   val input = opt[String](descr = "input path", required = true)
   val model = opt[String](descr = "model directory", required = false)
   val output = opt[String](descr = "output path", required = false)
+  val shuffle = opt[Boolean](descr = "shuffle data")
   verify()
 }
