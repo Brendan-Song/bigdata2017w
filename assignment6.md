@@ -20,7 +20,7 @@ Question 3
 
 Question 4
 ------------
-1-ROCA%: 13.65
+1-ROCA%: 17.38
 
 Question 5
 ------------
@@ -38,10 +38,10 @@ Iteration 6 1-ROCA%: 18.77
 
 Iteration 7 1-ROCA%: 14.84
 
-Iteration 8 1-ROCA%: 
+Iteration 8 1-ROCA%: 16.08
 
-Iteration 9 1-ROCA%: 
+Iteration 9 1-ROCA%: 18.33
 
-Iteration 10 1-ROCA%: 
+Iteration 10 1-ROCA%: 14.85
 
-Average 1-ROCA%: 
+Average 1-ROCA%: 17.468
